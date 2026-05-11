@@ -660,7 +660,7 @@ landing → "Get Started" → /signup (GitHub OAuth recommended path)
 
 ### 8.5 Visual design direction
 
-Low-fidelity wireframes for the 7 most-critical pages (landing, dashboard, playground, top-up modal, API keys, admin overview, admin users) are committed alongside this spec at `.superpowers/brainstorm/<session>/content/wireframes.html` and serve as the layout reference for implementation. Real visual polish comes at implementation time via shadcn/ui defaults + Tailwind tokens.
+Low-fidelity wireframes for the 7 most-critical pages (landing, dashboard, playground, top-up modal, API keys, admin overview, admin users) are committed alongside this spec at `docs/superpowers/specs/2026-05-11-maas-router-wireframes.html` (open in a browser) and serve as the layout reference for implementation. Real visual polish comes at implementation time via shadcn/ui defaults + Tailwind tokens.
 
 **Reference style:** Linear, Vercel, Stripe — clean, modern, generous whitespace, restrained color, strong typography hierarchy.
 
