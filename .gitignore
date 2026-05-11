@@ -1,0 +1,18 @@
+# Brainstorm artifacts (per superpowers convention)
+.superpowers/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+node_modules/
+dist/
+build/
+.next/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
