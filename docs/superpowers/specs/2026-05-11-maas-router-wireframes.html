@@ -1,0 +1,382 @@
+<h2>Wireframes — 7 critical pages</h2>
+<p class="subtitle">Low-fidelity layouts to settle structure before code. Real visuals come at implementation time via shadcn/ui.</p>
+
+<!-- 1. LANDING -->
+<div class="section">
+  <h3>1. Landing page (/)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Public homepage — zh-CN default</div>
+    <div class="mockup-body" style="padding:0; background:#fafafa;">
+      <!-- Top nav -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 24px;border-bottom:1px solid #e5e5e5;background:white;">
+        <div style="display:flex;gap:24px;align-items:center;">
+          <div style="font-weight:bold;font-size:16px;">⚡ MaaS Router</div>
+          <a style="color:#666;font-size:13px;">模型 Models</a>
+          <a style="color:#666;font-size:13px;">价格 Pricing</a>
+          <a style="color:#666;font-size:13px;">文档 Docs</a>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <span style="font-size:12px;color:#666;">中 / EN</span>
+          <button class="mock-button" style="background:transparent;border:1px solid #ddd;color:#333;">登录</button>
+          <button class="mock-button">开始使用 →</button>
+        </div>
+      </div>
+      <!-- Hero -->
+      <div style="padding:64px 32px;text-align:center;background:white;">
+        <div style="font-size:36px;font-weight:bold;line-height:1.2;max-width:680px;margin:0 auto 16px;">调用全球前沿大模型<br>用支付宝/微信结算</div>
+        <div style="font-size:16px;color:#666;max-width:540px;margin:0 auto 32px;">GPT-4o · Claude · Gemini — 一个 API, 一份账单, 18% 透明加价</div>
+        <button class="mock-button" style="padding:14px 28px;font-size:15px;">免费试用 $1 →</button>
+        <div style="font-size:11px;color:#999;margin-top:12px;">GitHub 登录无需邮箱验证</div>
+      </div>
+      <!-- Trust strip -->
+      <div style="padding:24px 32px;background:#fafafa;border-top:1px solid #eee;border-bottom:1px solid #eee;text-align:center;">
+        <div style="font-size:11px;color:#999;margin-bottom:12px;letter-spacing:1px;">SUPPORTED MODELS &amp; PAYMENTS</div>
+        <div style="display:flex;justify-content:center;gap:32px;font-size:12px;color:#666;">
+          <span>OpenAI</span><span>Anthropic</span><span>Google</span>
+          <span style="border-left:1px solid #ddd;padding-left:32px;">支付宝</span><span>微信支付</span><span>Visa / Mastercard</span>
+        </div>
+      </div>
+      <!-- 3 value props -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;padding:48px 32px;background:white;">
+        <div><div style="font-size:24px;margin-bottom:8px;">🌐</div><div style="font-weight:bold;margin-bottom:4px;">6+ 前沿模型</div><div style="font-size:13px;color:#666;">一个 OpenAI 兼容 API, 自由切换</div></div>
+        <div><div style="font-size:24px;margin-bottom:8px;">💰</div><div style="font-weight:bold;margin-bottom:4px;">支付宝/微信付款</div><div style="font-size:13px;color:#666;">不需要海外信用卡</div></div>
+        <div><div style="font-size:24px;margin-bottom:8px;">📊</div><div style="font-weight:bold;margin-bottom:4px;">18% 平价加价</div><div style="font-size:13px;color:#666;">无套餐, 用多少付多少</div></div>
+      </div>
+      <!-- Pricing preview -->
+      <div style="padding:48px 32px;background:#fafafa;text-align:center;">
+        <div style="font-size:11px;color:#999;margin-bottom:8px;letter-spacing:1px;">充值套餐</div>
+        <div style="font-weight:bold;font-size:20px;margin-bottom:24px;">选个金额开始用</div>
+        <div style="display:flex;justify-content:center;gap:16px;">
+          <div style="border:1px solid #ddd;border-radius:8px;padding:24px 32px;background:white;"><div style="font-size:24px;font-weight:bold;">$5</div><div style="font-size:11px;color:#666;">≈¥36</div></div>
+          <div style="border:2px solid #6366f1;border-radius:8px;padding:24px 32px;background:white;position:relative;"><div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#6366f1;color:white;font-size:10px;padding:2px 8px;border-radius:10px;">推荐</div><div style="font-size:24px;font-weight:bold;">$20</div><div style="font-size:11px;color:#666;">≈¥144</div></div>
+          <div style="border:1px solid #ddd;border-radius:8px;padding:24px 32px;background:white;"><div style="font-size:24px;font-weight:bold;">$50</div><div style="font-size:11px;color:#666;">≈¥360</div></div>
+        </div>
+      </div>
+      <!-- Models grid -->
+      <div style="padding:48px 32px;background:white;">
+        <div style="text-align:center;margin-bottom:32px;"><div style="font-weight:bold;font-size:20px;">支持的模型</div></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+          <div style="border:1px solid #eee;border-radius:6px;padding:12px;font-size:11px;"><div style="font-weight:bold;">GPT-4o</div><div style="color:#666;">$2.5/1M · 128K</div></div>
+          <div style="border:1px solid #eee;border-radius:6px;padding:12px;font-size:11px;"><div style="font-weight:bold;">GPT-4o-mini</div><div style="color:#666;">$0.15/1M · 128K</div></div>
+          <div style="border:1px solid #eee;border-radius:6px;padding:12px;font-size:11px;"><div style="font-weight:bold;">o1</div><div style="color:#666;">$15/1M · 200K</div></div>
+          <div style="border:1px solid #eee;border-radius:6px;padding:12px;font-size:11px;"><div style="font-weight:bold;">Claude 4.6 Sonnet</div><div style="color:#666;">$3/1M · 200K</div></div>
+          <div style="border:1px solid #eee;border-radius:6px;padding:12px;font-size:11px;"><div style="font-weight:bold;">Claude Haiku 4.5</div><div style="color:#666;">$0.8/1M · 200K</div></div>
+          <div style="border:1px solid #eee;border-radius:6px;padding:12px;font-size:11px;"><div style="font-weight:bold;">Gemini 2.5 Pro</div><div style="color:#666;">$1.25/1M · 1M</div></div>
+          <div style="border:1px solid #eee;border-radius:6px;padding:12px;font-size:11px;"><div style="font-weight:bold;">Gemini 2.5 Flash</div><div style="color:#666;">$0.075/1M · 1M</div></div>
+          <div style="border:1px solid #eee;border-radius:6px;padding:12px;font-size:11px;display:flex;align-items:center;justify-content:center;color:#999;">更多...</div>
+        </div>
+      </div>
+      <!-- Footer -->
+      <div style="padding:32px;background:#f5f5f5;font-size:11px;color:#666;text-align:center;">© 2026 MaaS Router · 服务条款 · 隐私政策 · 联系我们</div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. DASHBOARD -->
+<div class="section">
+  <h3>2. Dashboard (/dashboard)</h3>
+  <div class="mockup">
+    <div class="mockup-header">After login — first-time user view</div>
+    <div class="mockup-body" style="padding:0; background:#fafafa;">
+      <div style="display:flex;min-height:500px;">
+        <!-- Sidebar -->
+        <div style="width:200px;background:white;border-right:1px solid #e5e5e5;padding:16px;">
+          <div style="font-weight:bold;font-size:14px;margin-bottom:24px;">⚡ MaaS Router</div>
+          <div style="background:#f0f0ff;border-radius:6px;padding:12px;margin-bottom:24px;">
+            <div style="font-size:10px;color:#666;text-transform:uppercase;">余额</div>
+            <div style="font-size:20px;font-weight:bold;">$1.00</div>
+            <div style="font-size:10px;color:#999;">≈¥7.20</div>
+            <button class="mock-button" style="width:100%;margin-top:8px;font-size:11px;padding:6px;">充值</button>
+          </div>
+          <div style="font-size:13px;color:#333;padding:8px;background:#f5f5f5;border-radius:4px;margin-bottom:2px;">📊 概览</div>
+          <div style="font-size:13px;color:#666;padding:8px;">🔑 API Keys</div>
+          <div style="font-size:13px;color:#666;padding:8px;">📈 使用记录</div>
+          <div style="font-size:13px;color:#666;padding:8px;">💳 充值</div>
+          <div style="font-size:13px;color:#666;padding:8px;">🎮 Playground</div>
+          <div style="font-size:13px;color:#666;padding:8px;">⚙️ 设置</div>
+        </div>
+        <!-- Main -->
+        <div style="flex:1;padding:32px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+            <div style="font-size:22px;font-weight:bold;">你好, Russell 👋</div>
+            <div style="font-size:12px;color:#666;">中 / EN · 头像</div>
+          </div>
+          <!-- Onboarding callout for first-timer -->
+          <div style="border:2px dashed #6366f1;border-radius:8px;padding:20px;margin-bottom:24px;background:#fafaff;">
+            <div style="font-weight:bold;margin-bottom:8px;">👋 欢迎! 三步开始使用:</div>
+            <div style="font-size:13px;color:#444;line-height:1.8;">
+              1. ✅ 你已经获得 $1 试用额度<br>
+              2. ⬜ <a style="color:#6366f1;text-decoration:underline;">创建你的第一个 API key</a><br>
+              3. ⬜ <a style="color:#6366f1;text-decoration:underline;">在 Playground 试一下</a>
+            </div>
+          </div>
+          <!-- Stats row -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+            <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:16px;">
+              <div style="font-size:10px;color:#999;text-transform:uppercase;">7 天请求</div>
+              <div style="font-size:24px;font-weight:bold;">0</div>
+              <div style="font-size:10px;color:#666;">还没开始使用</div>
+            </div>
+            <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:16px;">
+              <div style="font-size:10px;color:#999;text-transform:uppercase;">7 天消费</div>
+              <div style="font-size:24px;font-weight:bold;">$0.00</div>
+              <div style="font-size:10px;color:#666;">≈¥0</div>
+            </div>
+            <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:16px;">
+              <div style="font-size:10px;color:#999;text-transform:uppercase;">API Keys</div>
+              <div style="font-size:24px;font-weight:bold;">0</div>
+              <div style="font-size:10px;color:#666;">点击创建 →</div>
+            </div>
+          </div>
+          <!-- Recent activity (empty state) -->
+          <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
+            <div style="font-weight:bold;margin-bottom:12px;">最近请求</div>
+            <div style="text-align:center;padding:40px 0;color:#999;font-size:13px;">还没有请求记录</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. PLAYGROUND -->
+<div class="section">
+  <h3>3. Playground (/dashboard/playground)</h3>
+  <div class="mockup">
+    <div class="mockup-header">In-browser chat with model picker, cost tracking, "show as code"</div>
+    <div class="mockup-body" style="padding:0; background:#fafafa;">
+      <div style="display:flex;min-height:500px;">
+        <!-- Collapsed sidebar -->
+        <div style="width:48px;background:white;border-right:1px solid #e5e5e5;padding:12px;display:flex;flex-direction:column;gap:16px;align-items:center;font-size:18px;color:#999;">
+          <div>⚡</div><div>📊</div><div>🔑</div><div>📈</div><div>💳</div><div style="color:#6366f1;font-weight:bold;">🎮</div><div>⚙️</div>
+        </div>
+        <!-- Main -->
+        <div style="flex:1;display:flex;flex-direction:column;">
+          <!-- Top bar -->
+          <div style="padding:12px 24px;background:white;border-bottom:1px solid #e5e5e5;display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <select class="mock-input" style="font-size:12px;width:240px;">
+                <option>Anthropic · Claude 4.6 Sonnet · $3/1M</option>
+              </select>
+              <div style="font-size:11px;color:#666;">本次对话: <strong>$0.03</strong></div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button style="font-size:11px;padding:6px 12px;border:1px solid #ddd;background:white;border-radius:4px;cursor:pointer;">&lt;/&gt; 显示代码</button>
+              <button style="font-size:11px;padding:6px 12px;border:1px solid #ddd;background:white;border-radius:4px;cursor:pointer;">清空对话</button>
+            </div>
+          </div>
+          <!-- Conversation -->
+          <div style="flex:1;padding:24px;overflow:auto;">
+            <!-- User message -->
+            <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+              <div style="max-width:70%;background:#6366f1;color:white;padding:10px 14px;border-radius:12px;font-size:13px;">用一句话解释什么是 transformer 架构</div>
+            </div>
+            <!-- Assistant message -->
+            <div style="display:flex;margin-bottom:6px;">
+              <div style="max-width:70%;background:white;border:1px solid #e5e5e5;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;">
+                Transformer 是一种基于自注意力机制 (self-attention) 的神经网络架构, 它能够并行处理序列中的所有位置, 同时通过注意力权重捕捉任意两个位置之间的关系, 这使它在长序列建模和并行计算上远超传统的 RNN 和 LSTM。
+              </div>
+            </div>
+            <div style="margin-left:8px;font-size:10px;color:#999;margin-bottom:24px;">本次回答: 67 输入 + 81 输出 = $0.001 · 230ms</div>
+            <!-- Composer (sticky bottom) -->
+          </div>
+          <div style="padding:16px 24px;background:white;border-top:1px solid #e5e5e5;display:flex;gap:8px;">
+            <input class="mock-input" placeholder="输入消息..." style="flex:1;">
+            <button class="mock-button">发送 ↑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 4. TOP-UP MODAL -->
+<div class="section">
+  <h3>4. Top-up modal (from /dashboard/billing)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Modal overlay on billing page</div>
+    <div class="mockup-body" style="padding:32px;background:rgba(0,0,0,0.4);">
+      <div style="max-width:440px;margin:0 auto;background:white;border-radius:12px;padding:32px;box-shadow:0 20px 50px rgba(0,0,0,0.2);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:18px;font-weight:bold;">充值</div>
+          <div style="color:#999;cursor:pointer;font-size:18px;">✕</div>
+        </div>
+        <div style="font-size:13px;color:#666;margin-bottom:24px;">当前余额: <strong>$1.00 ≈¥7.20</strong></div>
+        <div style="font-size:11px;text-transform:uppercase;color:#999;margin-bottom:8px;">选择金额</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+          <div style="border:1px solid #ddd;border-radius:6px;padding:12px;text-align:center;cursor:pointer;"><div style="font-weight:bold;">$5</div><div style="font-size:10px;color:#666;">≈¥36</div></div>
+          <div style="border:1px solid #ddd;border-radius:6px;padding:12px;text-align:center;cursor:pointer;"><div style="font-weight:bold;">$10</div><div style="font-size:10px;color:#666;">≈¥72</div></div>
+          <div style="border:2px solid #6366f1;border-radius:6px;padding:12px;text-align:center;cursor:pointer;background:#fafaff;position:relative;"><div style="position:absolute;top:-8px;right:-4px;background:#6366f1;color:white;font-size:9px;padding:1px 6px;border-radius:6px;">推荐</div><div style="font-weight:bold;">$20</div><div style="font-size:10px;color:#666;">≈¥144</div></div>
+          <div style="border:1px solid #ddd;border-radius:6px;padding:12px;text-align:center;cursor:pointer;"><div style="font-weight:bold;">$50</div><div style="font-size:10px;color:#666;">≈¥360</div></div>
+          <div style="border:1px solid #ddd;border-radius:6px;padding:12px;text-align:center;cursor:pointer;"><div style="font-weight:bold;">$100</div><div style="font-size:10px;color:#666;">≈¥720</div></div>
+          <div style="border:1px dashed #ddd;border-radius:6px;padding:12px;text-align:center;color:#999;font-size:11px;">自定义<br>(v2)</div>
+        </div>
+        <div style="font-size:11px;text-transform:uppercase;color:#999;margin-bottom:8px;">支付方式</div>
+        <div style="display:flex;gap:8px;margin-bottom:24px;">
+          <div style="flex:1;border:1px solid #ddd;border-radius:6px;padding:10px;text-align:center;font-size:12px;cursor:pointer;">💳 信用卡</div>
+          <div style="flex:1;border:2px solid #6366f1;border-radius:6px;padding:10px;text-align:center;font-size:12px;cursor:pointer;background:#fafaff;">🟦 支付宝</div>
+          <div style="flex:1;border:1px solid #ddd;border-radius:6px;padding:10px;text-align:center;font-size:12px;cursor:pointer;">🟢 微信支付</div>
+        </div>
+        <button class="mock-button" style="width:100%;padding:12px;">前往结账 →</button>
+        <div style="font-size:10px;color:#999;margin-top:12px;text-align:center;">即将跳转到 Stripe 安全支付页面</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 5. API KEYS -->
+<div class="section">
+  <h3>5. API Keys page (/dashboard/keys)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Key management with create modal preview</div>
+    <div class="mockup-body" style="padding:0;background:#fafafa;">
+      <div style="display:flex;min-height:380px;">
+        <div style="width:200px;background:white;border-right:1px solid #e5e5e5;padding:16px;">
+          <div style="font-weight:bold;font-size:13px;margin-bottom:16px;">⚡ MaaS Router</div>
+          <div style="font-size:12px;color:#666;padding:6px;">📊 概览</div>
+          <div style="font-size:12px;color:#333;padding:6px;background:#f5f5f5;border-radius:4px;">🔑 API Keys</div>
+          <div style="font-size:12px;color:#666;padding:6px;">📈 使用记录</div>
+        </div>
+        <div style="flex:1;padding:32px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <div>
+              <div style="font-size:22px;font-weight:bold;">API Keys</div>
+              <div style="font-size:12px;color:#666;margin-top:4px;">用于通过 API 调用模型 (最多 5 个活跃 key)</div>
+            </div>
+            <button class="mock-button">+ 新建 Key</button>
+          </div>
+          <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead style="background:#fafafa;">
+                <tr><th style="text-align:left;padding:10px;font-weight:600;">名称</th><th style="text-align:left;padding:10px;font-weight:600;">Key</th><th style="text-align:left;padding:10px;font-weight:600;">创建时间</th><th style="text-align:left;padding:10px;font-weight:600;">最近使用</th><th style="text-align:left;padding:10px;font-weight:600;">状态</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr style="border-top:1px solid #eee;"><td style="padding:10px;">production-app</td><td style="padding:10px;font-family:monospace;color:#666;">sk-or-AbCd...</td><td style="padding:10px;color:#666;">2 天前</td><td style="padding:10px;color:#666;">23 分钟前</td><td style="padding:10px;"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:10px;">活跃</span></td><td style="padding:10px;color:#dc2626;cursor:pointer;">撤销</td></tr>
+                <tr style="border-top:1px solid #eee;"><td style="padding:10px;">testing</td><td style="padding:10px;font-family:monospace;color:#666;">sk-or-XyZw...</td><td style="padding:10px;color:#666;">5 天前</td><td style="padding:10px;color:#666;">3 天前</td><td style="padding:10px;"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:10px;">活跃</span></td><td style="padding:10px;color:#dc2626;cursor:pointer;">撤销</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="margin-top:24px;padding:14px;background:#fffbe6;border:1px solid #fde68a;border-radius:6px;font-size:12px;color:#92400e;">⚠️ Key 只在创建时显示一次。请妥善保管, 不要泄露给他人。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. ADMIN OVERVIEW -->
+<div class="section">
+  <h3>6. Admin Overview (/admin)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Admin dashboard — gated by users.is_admin = true</div>
+    <div class="mockup-body" style="padding:0;background:#fafafa;">
+      <!-- Admin context bar -->
+      <div style="background:#fef2f2;color:#991b1b;padding:6px 24px;font-size:11px;font-weight:600;text-align:center;">⚠️ ADMIN MODE — 所有操作会记录到 audit log</div>
+      <div style="display:flex;min-height:460px;">
+        <!-- Admin sidebar -->
+        <div style="width:200px;background:#1f2937;color:#d1d5db;padding:16px;">
+          <div style="font-weight:bold;font-size:13px;margin-bottom:16px;color:white;">⚙️ Admin Panel</div>
+          <div style="font-size:12px;padding:6px;background:#374151;border-radius:4px;color:white;">📊 Overview</div>
+          <div style="font-size:12px;padding:6px;">💵 Pricing</div>
+          <div style="font-size:12px;padding:6px;">🤖 Models</div>
+          <div style="font-size:12px;padding:6px;">👥 Users</div>
+          <div style="font-size:12px;padding:6px;">💳 Transactions</div>
+          <div style="font-size:12px;padding:6px;">📋 Requests</div>
+          <div style="font-size:12px;padding:6px;">📝 Audit Log</div>
+          <div style="margin-top:24px;padding-top:16px;border-top:1px solid #374151;font-size:11px;">
+            <div style="color:#9ca3af;">Signed in as</div>
+            <div style="color:white;font-weight:600;">admin@maas.com</div>
+            <div style="color:#6366f1;margin-top:8px;cursor:pointer;">← Back to dashboard</div>
+          </div>
+        </div>
+        <!-- Main -->
+        <div style="flex:1;padding:24px;">
+          <div style="font-size:22px;font-weight:bold;margin-bottom:24px;">Admin Overview</div>
+          <!-- KPI cards -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;">
+            <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:14px;"><div style="font-size:10px;color:#999;text-transform:uppercase;">Users today</div><div style="font-size:22px;font-weight:bold;">12</div><div style="font-size:10px;color:#16a34a;">+33% vs yesterday</div></div>
+            <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:14px;"><div style="font-size:10px;color:#999;text-transform:uppercase;">Revenue today</div><div style="font-size:22px;font-weight:bold;">$284</div><div style="font-size:10px;color:#16a34a;">+18%</div></div>
+            <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:14px;"><div style="font-size:10px;color:#999;text-transform:uppercase;">Requests/min</div><div style="font-size:22px;font-weight:bold;">47</div><div style="font-size:10px;color:#666;">p99 1.2s</div></div>
+            <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:14px;"><div style="font-size:10px;color:#999;text-transform:uppercase;">Error rate</div><div style="font-size:22px;font-weight:bold;color:#16a34a;">0.4%</div><div style="font-size:10px;color:#666;">all green</div></div>
+          </div>
+          <!-- Margin / charts -->
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:16px;">
+            <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:16px;">
+              <div style="font-weight:bold;font-size:13px;margin-bottom:12px;">Revenue (last 30 days)</div>
+              <div class="placeholder" style="height:140px;display:flex;align-items:center;justify-content:center;color:#999;font-size:11px;">[line chart placeholder]</div>
+            </div>
+            <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:16px;">
+              <div style="font-weight:bold;font-size:13px;margin-bottom:12px;">Margin today</div>
+              <div style="font-size:28px;font-weight:bold;">17.6%</div>
+              <div style="font-size:11px;color:#666;">Rev $284 - COGS $234 = $50</div>
+              <div style="margin-top:12px;font-size:11px;color:#666;">Target: 15-18% ✓</div>
+            </div>
+          </div>
+          <!-- Alerts -->
+          <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;padding:14px;">
+            <div style="font-weight:bold;font-size:13px;margin-bottom:8px;">Recent alerts</div>
+            <div style="font-size:11px;color:#666;display:flex;justify-content:space-between;padding:4px 0;"><span>⚠️ User u_x9k3 — $52 spend in 18h (signup yesterday)</span><span style="color:#6366f1;cursor:pointer;">Review →</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 7. ADMIN USERS -->
+<div class="section">
+  <h3>7. Admin · Users (/admin/users)</h3>
+  <div class="mockup">
+    <div class="mockup-header">User search, suspend, manual credit adjustment</div>
+    <div class="mockup-body" style="padding:0;background:#fafafa;">
+      <div style="background:#fef2f2;color:#991b1b;padding:6px 24px;font-size:11px;font-weight:600;text-align:center;">⚠️ ADMIN MODE</div>
+      <div style="display:flex;min-height:420px;">
+        <div style="width:200px;background:#1f2937;color:#d1d5db;padding:16px;">
+          <div style="font-weight:bold;font-size:13px;margin-bottom:16px;color:white;">⚙️ Admin Panel</div>
+          <div style="font-size:12px;padding:6px;">📊 Overview</div>
+          <div style="font-size:12px;padding:6px;">💵 Pricing</div>
+          <div style="font-size:12px;padding:6px;">🤖 Models</div>
+          <div style="font-size:12px;padding:6px;background:#374151;border-radius:4px;color:white;">👥 Users</div>
+          <div style="font-size:12px;padding:6px;">💳 Transactions</div>
+          <div style="font-size:12px;padding:6px;">📋 Requests</div>
+          <div style="font-size:12px;padding:6px;">📝 Audit Log</div>
+        </div>
+        <div style="flex:1;padding:24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div style="font-size:22px;font-weight:bold;">Users</div>
+            <div style="display:flex;gap:8px;">
+              <input class="mock-input" placeholder="Search by email or user ID..." style="width:280px;font-size:12px;">
+              <select class="mock-input" style="font-size:12px;"><option>All</option><option>Active</option><option>Suspended</option><option>Banned</option></select>
+            </div>
+          </div>
+          <div style="background:white;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden;">
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead style="background:#fafafa;">
+                <tr><th style="text-align:left;padding:8px;font-weight:600;">Email</th><th style="text-align:left;padding:8px;">Signup</th><th style="text-align:left;padding:8px;">Method</th><th style="text-align:right;padding:8px;">Balance</th><th style="text-align:right;padding:8px;">Spend 30d</th><th style="text-align:left;padding:8px;">Status</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr style="border-top:1px solid #eee;"><td style="padding:8px;">zhao@example.com</td><td style="padding:8px;color:#666;">2d ago</td><td style="padding:8px;color:#666;">GitHub</td><td style="padding:8px;text-align:right;">$18.43</td><td style="padding:8px;text-align:right;">$1.57</td><td style="padding:8px;"><span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:8px;font-size:10px;">active</span></td><td style="padding:8px;color:#6366f1;cursor:pointer;">Manage →</td></tr>
+                <tr style="border-top:1px solid #eee;background:#fef9c3;"><td style="padding:8px;">u_x9k3@temp.com</td><td style="padding:8px;color:#666;">18h ago</td><td style="padding:8px;color:#666;">email</td><td style="padding:8px;text-align:right;">$47.23</td><td style="padding:8px;text-align:right;color:#dc2626;">$52.77 ⚠️</td><td style="padding:8px;"><span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:8px;font-size:10px;">review</span></td><td style="padding:8px;color:#6366f1;cursor:pointer;">Manage →</td></tr>
+                <tr style="border-top:1px solid #eee;"><td style="padding:8px;">li@dev.cn</td><td style="padding:8px;color:#666;">5d ago</td><td style="padding:8px;color:#666;">GitHub</td><td style="padding:8px;text-align:right;">$2.10</td><td style="padding:8px;text-align:right;">$7.90</td><td style="padding:8px;"><span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:8px;font-size:10px;">active</span></td><td style="padding:8px;color:#6366f1;cursor:pointer;">Manage →</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Manage panel preview (would be modal or detail page) -->
+          <div style="margin-top:16px;background:white;border:1px solid #e5e5e5;border-radius:8px;padding:16px;">
+            <div style="font-weight:bold;font-size:13px;margin-bottom:12px;">Manage: u_x9k3@temp.com</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+              <button style="padding:8px;border:1px solid #ddd;background:white;border-radius:4px;font-size:11px;cursor:pointer;">+ Adjust credits</button>
+              <button style="padding:8px;border:1px solid #f59e0b;color:#92400e;background:#fffbe6;border-radius:4px;font-size:11px;cursor:pointer;">⚠️ Suspend</button>
+              <button style="padding:8px;border:1px solid #dc2626;color:#991b1b;background:#fef2f2;border-radius:4px;font-size:11px;cursor:pointer;">⛔ Ban</button>
+            </div>
+            <div style="font-size:11px;color:#666;margin-top:12px;">Adjustments require a reason and are written to audit_logs.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:32px;font-size:12px;color:#666;">
+These are <strong>low-fidelity wireframes</strong> for layout/structure decisions. Real visual polish happens at implementation time using shadcn/ui defaults + Tailwind.
+Color: <strong>indigo-600 (#6366f1)</strong> as primary accent. Background: neutral grays. Admin context uses dark sidebar + red top-bar to make context obvious.
+</p>

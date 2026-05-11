@@ -658,7 +658,48 @@ landing → "Get Started" → /signup (GitHub OAuth recommended path)
 
 **shadcn/ui + Tailwind CSS.** Components copy-pasted into the repo, fully owned, no version-bump churn. Good zh-CN font handling out of the box. Material-UI and Ant Design are explicitly rejected — too opinionated, fight with custom styling.
 
-### 8.5 Explicitly out of scope (deferred to v2+)
+### 8.5 Visual design direction
+
+Low-fidelity wireframes for the 7 most-critical pages (landing, dashboard, playground, top-up modal, API keys, admin overview, admin users) are committed alongside this spec at `.superpowers/brainstorm/<session>/content/wireframes.html` and serve as the layout reference for implementation. Real visual polish comes at implementation time via shadcn/ui defaults + Tailwind tokens.
+
+**Reference style:** Linear, Vercel, Stripe — clean, modern, generous whitespace, restrained color, strong typography hierarchy.
+
+**Color palette:**
+- Primary accent: `indigo-600` (#6366f1) — CTAs, links, selected states, charts
+- Surface: white for cards, `gray-50` (#fafafa) for page background
+- Borders: `gray-200` (#e5e5e5)
+- Text: `gray-900` primary, `gray-600` secondary, `gray-400` tertiary
+- Success: `green-600`; Warning: `amber-500`; Danger: `red-600`
+- **Admin context visually distinct:** dark `gray-800` sidebar + `red-50` top strip, so admin pages can't be confused with user pages
+
+**Typography:**
+- Latin: Inter (variable, weights 400/500/600/700)
+- Chinese: Noto Sans SC web font with fallback to PingFang SC (Apple) and Microsoft YaHei (Windows)
+- Stack: `font-family: Inter, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;`
+- Use Tailwind's type scale; no custom font sizes
+
+**Density and spacing:**
+- Marketing (landing, pricing, docs): spacious — section padding `py-16` to `py-24`
+- Dashboard / settings: medium — `py-6` to `py-8`
+- Tables / data-dense areas: compact — Tailwind defaults
+
+**Iconography:** `lucide-react` (bundled with shadcn/ui). Meaningful icons only, never decorative.
+
+**Light mode only for MVP.** Dark mode deferred to v2.
+
+**Brand:** placeholder wordmark `⚡ MaaS Router` until a designer is engaged. **The actual brand name is not finalized — pick before going public.**
+
+**Bilingual layout considerations:**
+- Chinese characters occupy ~30% less horizontal space than equivalent English. Test every page in both languages — English can overflow buttons designed for Chinese.
+- Numbers and prices always use Latin numerals (`$20`, `¥144`), never Chinese numerals.
+
+**Accessibility (WCAG 2.1 AA target):**
+- All interactive elements keyboard-reachable
+- Color contrast ≥ 4.5:1 for normal text, ≥ 3:1 for large text
+- Form labels properly associated; error messages tied via `aria-describedby`
+- Focus rings always visible — never `outline: none` without a replacement
+
+### 8.6 Explicitly out of scope (deferred to v2+)
 
 - Team / organization accounts
 - Per-API-key rate limits or spending caps
