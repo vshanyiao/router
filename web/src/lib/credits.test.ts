@@ -31,7 +31,7 @@ describe('grantTrialCreditIfEligible', () => {
     mockFindFirst.mockResolvedValue(null)
     mockSetNx.mockResolvedValue('OK')
     mockTransaction.mockImplementation(async (fn: any) => fn({
-      user: { update: vi.fn().mockResolvedValue({ creditsCents: 100n }) },
+      user: { update: vi.fn().mockResolvedValue({ creditsCents: BigInt(100) }) },
       creditTransaction: { create: vi.fn().mockResolvedValue({}) },
     }))
 
