@@ -1,4 +1,4 @@
-.PHONY: up down logs seed migrate test clean
+.PHONY: up down logs seed migrate migrate-new reset-db test-web test-proxy test clean
 
 up:
 	docker compose up
