@@ -16,3 +16,20 @@ build/
 .DS_Store
 .vscode/
 .idea/
+
+# Node / Next.js
+*.log
+.turbo/
+
+# Go
+proxy/tmp/
+proxy/bin/
+*.test
+
+# Database
+*.db
+*.sqlite
+
+# IDE swap files
+*.swp
+*.swo

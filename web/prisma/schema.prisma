@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  passwordHash    String?   @map("password_hash")
+  githubId        String?   @unique @map("github_id")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  locale          String    @default("zh-CN")
+  creditsCents    BigInt    @default(0) @map("credits_cents")
+  status          String    @default("active")
+  isAdmin         Boolean   @default(false) @map("is_admin")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  accounts            Account[]
+  sessions            Session[]
+  apiKeys             ApiKey[]
+  creditTransactions  CreditTransaction[]
+  paymentIntents      PaymentIntent[]
+  requestLogs         RequestLog[]
+  auditLogs           AuditLog[] @relation("AuditActor")
+  targetedAuditLogs   AuditLog[] @relation("AuditTarget")
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id") @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id") @db.Uuid
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  name        String
+  keyPrefix   String    @map("key_prefix")
+  keyHash     String    @unique @map("key_hash")
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  revokedAt   DateTime? @map("revoked_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("api_keys")
+}
+
+model CreditTransaction {
+  id                 String    @id @default(uuid()) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  amountCents        BigInt    @map("amount_cents")
+  kind               String
+  requestId          String?   @map("request_id") @db.Uuid
+  paymentIntentId    String?   @map("payment_intent_id") @db.Uuid
+  balanceAfterCents  BigInt    @map("balance_after_cents")
+  description        String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  user            User           @relation(fields: [userId], references: [id])
+  paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id])
+
+  @@index([userId, createdAt])
+  @@map("credit_transactions")
+}
+
+model PaymentIntent {
+  id                       String    @id @default(uuid()) @db.Uuid
+  userId                   String    @map("user_id") @db.Uuid
+  stripePaymentIntentId    String?   @unique @map("stripe_payment_intent_id")
+  stripeCheckoutSessionId  String?   @unique @map("stripe_checkout_session_id")
+  amountCents              BigInt    @map("amount_cents")
+  creditsAddedCents        BigInt    @map("credits_added_cents")
+  currency                 String    @default("usd")
+  status                   String
+  createdAt                DateTime  @default(now()) @map("created_at")
+  completedAt              DateTime? @map("completed_at")
+
+  user        User                 @relation(fields: [userId], references: [id])
+  transactions CreditTransaction[]
+
+  @@map("payment_intents")
+}
+
+model RequestLog {
+  id                  String    @id @default(uuid()) @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  apiKeyId            String    @map("api_key_id") @db.Uuid
+  apiSurface          String    @map("api_surface")
+  upstreamProvider    String    @map("upstream_provider")
+  upstreamModel       String    @map("upstream_model")
+  modelAlias          String    @map("model_alias")
+  promptTokens        Int?      @map("prompt_tokens")
+  completionTokens    Int?      @map("completion_tokens")
+  inputCostCents      Int       @default(0) @map("input_cost_cents")
+  outputCostCents     Int       @default(0) @map("output_cost_cents")
+  marginCents         Int       @default(0) @map("margin_cents")
+  totalChargedCents   Int       @default(0) @map("total_charged_cents")
+  streaming           Boolean   @default(false)
+  status              String
+  errorMessage        String?   @map("error_message")
+  latencyMs           Int?      @map("latency_ms")
+  createdAt           DateTime  @map("created_at")
+  completedAt         DateTime? @map("completed_at")
+
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("request_logs")
+}
+
+model ModelCatalog {
+  id                            String   @id @default(uuid()) @db.Uuid
+  alias                         String   @unique
+  displayName                   String   @map("display_name")
+  upstreamProvider              String   @map("upstream_provider")
+  upstreamModelId               String   @map("upstream_model_id")
+  contextWindow                 Int      @map("context_window")
+  supportsStreaming             Boolean  @default(true) @map("supports_streaming")
+  supportsTools                 Boolean  @default(false) @map("supports_tools")
+  supportsVision                Boolean  @default(false) @map("supports_vision")
+  inputCentsPerMillionTokens    Int      @map("input_cents_per_million_tokens")
+  outputCentsPerMillionTokens   Int      @map("output_cents_per_million_tokens")
+  markupPct                     Int      @default(18) @map("markup_pct")
+  status                        String   @default("active")
+  tags                          String[] @default([])
+  descriptionZh                 String?  @map("description_zh")
+  descriptionEn                 String?  @map("description_en")
+  createdAt                     DateTime @default(now()) @map("created_at")
+  updatedAt                     DateTime @updatedAt @map("updated_at")
+
+  @@map("model_catalog")
+}
+
+model AppConfig {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_config")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  targetUserId String?  @map("target_user_id") @db.Uuid
+  kind         String
+  payload      Json
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  actor   User? @relation("AuditActor", fields: [userId], references: [id])
+  target  User? @relation("AuditTarget", fields: [targetUserId], references: [id])
+
+  @@map("audit_logs")
+}
