@@ -17,6 +17,7 @@ import (
 	"github.com/admin/maas-router/proxy/internal/provider/anthropic"
 	"github.com/admin/maas-router/proxy/internal/provider/gemini"
 	"github.com/admin/maas-router/proxy/internal/provider/openai"
+	"github.com/admin/maas-router/proxy/internal/reaper"
 	"github.com/admin/maas-router/proxy/internal/server"
 	"github.com/admin/maas-router/proxy/internal/storage"
 	"github.com/admin/maas-router/proxy/internal/tokenizer"
@@ -51,6 +52,9 @@ func main() {
 
 	reactor := logging.New(pg)
 	go reactor.Run(ctx)
+
+	rp := reaper.New(pg, 60*time.Second, 5*time.Minute)
+	go rp.Run(ctx)
 
 	openaiKey := os.Getenv("OPENAI_API_KEY")
 	anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
