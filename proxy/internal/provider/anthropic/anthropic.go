@@ -16,11 +16,16 @@ import (
 
 const apiURL = "https://api.anthropic.com/v1/messages"
 
+// httpClient has no Timeout — streaming requests can legitimately last
+// several minutes. Cancellation is driven by the request context instead.
+// Non-streaming requests should pass a context with timeout from the caller.
+var httpClient = &http.Client{}
+
 type Adapter struct {
 	HTTP *http.Client
 }
 
-func New() *Adapter { return &Adapter{HTTP: http.DefaultClient} }
+func New() *Adapter { return &Adapter{HTTP: httpClient} }
 
 type messageBody struct {
 	Model     string      `json:"model"`

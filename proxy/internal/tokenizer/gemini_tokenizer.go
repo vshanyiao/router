@@ -14,7 +14,8 @@ type GeminiTokenizer struct {
 }
 
 func NewGeminiTokenizer(apiKey string) *GeminiTokenizer {
-	return &GeminiTokenizer{APIKey: apiKey, HTTP: http.DefaultClient}
+	// Reuses the same 90s-bounded client defined in anthropic_tokenizer.go
+	return &GeminiTokenizer{APIKey: apiKey, HTTP: tokenizerHTTPClient}
 }
 
 type geminiCountReq struct {

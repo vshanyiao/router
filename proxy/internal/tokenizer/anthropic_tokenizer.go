@@ -6,7 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
+
+// tokenizerHTTPClient bounds count_tokens API calls so a hung upstream
+// cannot indefinitely block a request goroutine.
+var tokenizerHTTPClient = &http.Client{Timeout: 90 * time.Second}
 
 type AnthropicTokenizer struct {
 	APIKey string
@@ -14,7 +19,7 @@ type AnthropicTokenizer struct {
 }
 
 func NewAnthropicTokenizer(apiKey string) *AnthropicTokenizer {
-	return &AnthropicTokenizer{APIKey: apiKey, HTTP: http.DefaultClient}
+	return &AnthropicTokenizer{APIKey: apiKey, HTTP: tokenizerHTTPClient}
 }
 
 type anthropicCountReq struct {

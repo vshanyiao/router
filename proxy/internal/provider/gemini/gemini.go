@@ -14,9 +14,13 @@ import (
 
 const baseURL = "https://generativelanguage.googleapis.com/v1beta/models"
 
+// httpClient has no Timeout — streaming requests can legitimately last
+// several minutes. Cancellation is driven by the request context instead.
+var httpClient = &http.Client{}
+
 type Adapter struct{ HTTP *http.Client }
 
-func New() *Adapter { return &Adapter{HTTP: http.DefaultClient} }
+func New() *Adapter { return &Adapter{HTTP: httpClient} }
 
 type genReq struct {
 	Contents          []content `json:"contents"`
