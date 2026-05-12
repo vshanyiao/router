@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { grantTrialCreditIfEligible } from '@/lib/credits'
 
@@ -8,24 +9,44 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing token' }, { status: 400 })
   }
 
-  const vt = await prisma.verificationToken.findUnique({ where: { token } })
-  if (!vt || vt.expires < new Date()) {
-    return NextResponse.json({ error: 'Invalid or expired token' }, { status: 400 })
-  }
-
-  const user = await prisma.user.findUnique({ where: { email: vt.identifier } })
-  if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 400 })
-  }
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { emailVerifiedAt: new Date() },
-  })
-  await prisma.verificationToken.delete({ where: { token } })
-
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '0.0.0.0'
-  await grantTrialCreditIfEligible(user.id, ip)
+
+  let userId: string | null = null
+  try {
+    userId = await prisma.$transaction(async (tx) => {
+      // Delete-first serializes concurrent verify attempts: the second request
+      // hits "record not found" because the first transaction already deleted it.
+      let deleted
+      try {
+        deleted = await tx.verificationToken.delete({ where: { token } })
+      } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
+          throw new Error('TOKEN_NOT_FOUND')
+        }
+        throw e
+      }
+      if (deleted.expires < new Date()) throw new Error('TOKEN_EXPIRED')
+
+      const user = await tx.user.findUnique({ where: { email: deleted.identifier } })
+      if (!user) throw new Error('USER_NOT_FOUND')
+
+      await tx.user.update({
+        where: { id: user.id },
+        data: { emailVerifiedAt: new Date() },
+      })
+      return user.id
+    })
+  } catch (e) {
+    const msg = (e as Error).message
+    if (msg === 'TOKEN_EXPIRED') {
+      return NextResponse.json({ error: 'Token expired' }, { status: 400 })
+    }
+    return NextResponse.json({ error: 'Invalid token' }, { status: 400 })
+  }
+
+  // Trial credit grant runs outside the verify transaction. It has its own
+  // per-user DB check and per-IP Redis SETNX so concurrent calls are safe.
+  await grantTrialCreditIfEligible(userId!, ip)
 
   return NextResponse.json({ ok: true })
 }
