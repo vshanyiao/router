@@ -51,7 +51,11 @@ func main() {
 	cat.StartAutoRefresh(ctx, 60*time.Second)
 
 	reactor := logging.New(pg)
-	go reactor.Run(ctx)
+	reactorDone := make(chan struct{})
+	go func() {
+		defer close(reactorDone)
+		reactor.Run(ctx)
+	}()
 
 	rp := reaper.New(pg, 60*time.Second, 5*time.Minute)
 	go rp.Run(ctx)
@@ -117,5 +121,13 @@ func main() {
 	defer scancel()
 	_ = srv.Shutdown(shutdownCtx)
 	cancel()
-	time.Sleep(200 * time.Millisecond)
+
+	// Wait for the Reactor to finish draining its inbox before exiting so
+	// in-flight request_logs aren't dropped on SIGTERM. Cap at 10s — if the
+	// DB is unresponsive longer than that, accept the loss and exit.
+	select {
+	case <-reactorDone:
+	case <-time.After(10 * time.Second):
+		log.Println("warn: reactor drain timed out after 10s; some logs may be lost")
+	}
 }
