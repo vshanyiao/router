@@ -137,11 +137,14 @@ func ToCanonical(req ChatCompletionsRequest) (canonical.Request, error) {
 }
 
 func parseContent(raw json.RawMessage) ([]canonical.ContentBlock, error) {
-	if len(raw) == 0 {
+	if len(raw) == 0 || string(raw) == "null" {
 		return nil, nil
 	}
 	var s string
 	if err := json.Unmarshal(raw, &s); err == nil {
+		if s == "" {
+			return nil, nil
+		}
 		return []canonical.ContentBlock{canonical.TextBlock(s)}, nil
 	}
 	var parts []ContentPart
