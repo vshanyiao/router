@@ -19,11 +19,12 @@ func NewGeminiTokenizer(apiKey string) *GeminiTokenizer {
 }
 
 type geminiCountReq struct {
-	Contents []geminiContent `json:"contents"`
+	Contents          []geminiContent `json:"contents"`
+	SystemInstruction *geminiContent  `json:"systemInstruction,omitempty"`
 }
 
 type geminiContent struct {
-	Role  string       `json:"role"`
+	Role  string       `json:"role,omitempty"`
 	Parts []geminiPart `json:"parts"`
 }
 
@@ -39,19 +40,30 @@ func (t *GeminiTokenizer) CountPromptTokens(ctx context.Context, model string, m
 	if t.APIKey == "" {
 		return 0, fmt.Errorf("gemini api key not configured")
 	}
+	// Mirror the inference adapter's body shape: system goes to systemInstruction,
+	// assistant maps to "model". A `user`-as-system would diverge from what the
+	// real inference call charges and may also cause non-alternating-role errors.
 	body := geminiCountReq{}
+	var sysText string
 	for _, m := range messages {
+		if m.Role == "system" {
+			if sysText != "" {
+				sysText += "\n\n"
+			}
+			sysText += m.Content
+			continue
+		}
 		role := m.Role
 		if role == "assistant" {
 			role = "model"
-		}
-		if role == "system" {
-			role = "user"
 		}
 		body.Contents = append(body.Contents, geminiContent{
 			Role:  role,
 			Parts: []geminiPart{{Text: m.Content}},
 		})
+	}
+	if sysText != "" {
+		body.SystemInstruction = &geminiContent{Parts: []geminiPart{{Text: sysText}}}
 	}
 	buf, _ := json.Marshal(body)
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:countTokens", model)

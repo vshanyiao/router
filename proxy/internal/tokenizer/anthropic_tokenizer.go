@@ -24,6 +24,7 @@ func NewAnthropicTokenizer(apiKey string) *AnthropicTokenizer {
 
 type anthropicCountReq struct {
 	Model    string             `json:"model"`
+	System   string             `json:"system,omitempty"`
 	Messages []anthropicMessage `json:"messages"`
 }
 
@@ -40,13 +41,20 @@ func (t *AnthropicTokenizer) CountPromptTokens(ctx context.Context, model string
 	if t.APIKey == "" {
 		return 0, fmt.Errorf("anthropic api key not configured")
 	}
+	// Mirror the inference adapter's body shape: system goes to its own field,
+	// only user/assistant turns appear in messages. Otherwise the count_tokens
+	// API can reject non-alternating role sequences and the token count for a
+	// system-as-user turn diverges from the system-as-system-field charge.
 	body := anthropicCountReq{Model: model}
 	for _, m := range messages {
-		role := m.Role
-		if role == "system" {
-			role = "user"
+		if m.Role == "system" {
+			if body.System != "" {
+				body.System += "\n\n"
+			}
+			body.System += m.Content
+			continue
 		}
-		body.Messages = append(body.Messages, anthropicMessage{Role: role, Content: m.Content})
+		body.Messages = append(body.Messages, anthropicMessage{Role: m.Role, Content: m.Content})
 	}
 	buf, _ := json.Marshal(body)
 	req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages/count_tokens", bytes.NewReader(buf))
