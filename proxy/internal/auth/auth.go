@@ -33,7 +33,11 @@ var (
 	ErrUserBanned  = errors.New("user not active")
 )
 
-const cacheTTL = 5 * time.Minute
+// cacheTTL is intentionally short so admin status changes (suspend/ban)
+// propagate to the proxy within 30s without requiring an active cache-
+// invalidation channel from web. Trade: ~2x DB load on cache misses.
+// Phase 4 (admin panel) should add active invalidation and bump this back up.
+const cacheTTL = 30 * time.Second
 
 type Auth struct {
 	PG     *pgxpool.Pool
