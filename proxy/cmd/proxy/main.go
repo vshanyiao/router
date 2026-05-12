@@ -73,27 +73,43 @@ func main() {
 	tokReg.Register("anthropic", tokenizer.NewAnthropicTokenizer(anthropicKey))
 	tokReg.Register("google", tokenizer.NewGeminiTokenizer(geminiKey))
 
+	authSvc := auth.New(pg, rdb, hmacSecret)
+	billSvc := billing.New(pg)
+	providers := map[string]provider.Provider{
+		"openai":    openai.New(),
+		"anthropic": anthropic.New(),
+		"google":    gemini.New(),
+	}
+	keys := map[string]string{
+		"openai":    openaiKey,
+		"anthropic": anthropicKey,
+		"google":    geminiKey,
+	}
+
 	handler := &server.OpenAIHandler{
-		Auth:    auth.New(pg, rdb, hmacSecret),
-		Billing: billing.New(pg),
-		Catalog: cat,
-		Providers: map[string]provider.Provider{
-			"openai":    openai.New(),
-			"anthropic": anthropic.New(),
-			"google":    gemini.New(),
-		},
+		Auth:       authSvc,
+		Billing:    billSvc,
+		Catalog:    cat,
+		Providers:  providers,
 		Tokenizers: tokReg,
-		Keys: map[string]string{
-			"openai":    openaiKey,
-			"anthropic": anthropicKey,
-			"google":    geminiKey,
-		},
-		Reactor: reactor,
+		Keys:       keys,
+		Reactor:    reactor,
+	}
+
+	anthropicHandler := &server.AnthropicHandler{
+		Auth:       authSvc,
+		Billing:    billSvc,
+		Catalog:    cat,
+		Providers:  providers,
+		Tokenizers: tokReg,
+		Keys:       keys,
+		Reactor:    reactor,
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	mux.HandleFunc("/v1/chat/completions", handler.ChatCompletions)
+	mux.HandleFunc("/v1/messages", anthropicHandler.Messages)
 
 	port := os.Getenv("PORT")
 	if port == "" {

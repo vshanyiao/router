@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,13 +20,13 @@ import (
 	"github.com/admin/maas-router/proxy/internal/provider"
 	"github.com/admin/maas-router/proxy/internal/stream"
 	"github.com/admin/maas-router/proxy/internal/tokenizer"
-	toai "github.com/admin/maas-router/proxy/internal/translate/oai"
+	tanthropic "github.com/admin/maas-router/proxy/internal/translate/anthropic"
 )
 
-// OpenAIHandler serves POST /v1/chat/completions, the OpenAI-compatible
-// surface. Lowering goes through translate/oai → canonical → provider, so
-// tool calls and vision work across all three upstream providers.
-type OpenAIHandler struct {
+// AnthropicHandler serves POST /v1/messages, the Anthropic-compatible surface.
+// Shares Auth/Billing/Catalog/Reactor with the OAI handler — only the wire
+// format differs.
+type AnthropicHandler struct {
 	Auth       *auth.Auth
 	Billing    *billing.Service
 	Catalog    *catalog.Catalog
@@ -35,104 +36,119 @@ type OpenAIHandler struct {
 	Reactor    *logging.Reactor
 }
 
-func writeError(w http.ResponseWriter, status int, msg string) {
+// extractBearer accepts either Anthropic's `x-api-key: sk-or-...` or the
+// `Authorization: Bearer sk-or-...` header that most clients also support.
+func extractBearer(r *http.Request) string {
+	if v := r.Header.Get("x-api-key"); v != "" {
+		return "Bearer " + v
+	}
+	return r.Header.Get("Authorization")
+}
+
+func writeAnthropicError(w http.ResponseWriter, status int, errType, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"error": map[string]string{"message": msg, "type": "invalid_request_error"},
+		"type":  "error",
+		"error": map[string]string{"type": errType, "message": msg},
 	})
 }
 
-func (h *OpenAIHandler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
+func (h *AnthropicHandler) Messages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	started := time.Now()
 
+	// Cleanup context survives client disconnect for billing finalize + log.
 	cleanupCtx, cleanupCancel := contextWithoutCancel(ctx, 10*time.Second)
 	defer cleanupCancel()
 
-	var req toai.ChatCompletionsRequest
+	var req tanthropic.MessagesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "invalid JSON body")
 		return
 	}
 	if req.Model == "" {
-		writeError(w, http.StatusBadRequest, "model is required")
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "model is required")
 		return
 	}
 	if len(req.Messages) == 0 {
-		writeError(w, http.StatusBadRequest, "messages required")
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "messages required")
 		return
 	}
 	if req.MaxTokens <= 0 {
 		req.MaxTokens = 1024
 	}
 
-	canReq, err := toai.ToCanonical(req)
+	// Lower to canonical IR
+	canReq, err := tanthropic.ToCanonical(req)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return
 	}
 
-	result, err := h.Auth.LookupBearer(ctx, r.Header.Get("Authorization"))
+	// Auth
+	result, err := h.Auth.LookupBearer(ctx, extractBearer(r))
 	if err != nil {
 		if errors.Is(err, auth.ErrUserBanned) {
-			writeError(w, http.StatusForbidden, "account suspended or banned")
+			writeAnthropicError(w, http.StatusForbidden, "permission_error", "account suspended or banned")
 		} else {
-			writeError(w, http.StatusUnauthorized, "invalid API key")
+			writeAnthropicError(w, http.StatusUnauthorized, "authentication_error", "invalid API key")
 		}
 		return
 	}
 
+	// Catalog lookup — use req.Model as alias; map to upstream
 	model, err := h.Catalog.Get(req.Model)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "model '"+req.Model+"' not found")
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "model '"+req.Model+"' not found")
 		return
 	}
 
+	// Resolve provider + key
 	prov, provOK := h.Providers[model.UpstreamProvider]
 	if !provOK {
-		writeError(w, http.StatusBadRequest, "no provider adapter for "+model.UpstreamProvider)
+		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error", "no provider adapter for "+model.UpstreamProvider)
 		return
 	}
 	apiKey, keyOK := h.Keys[model.UpstreamProvider]
 	if !keyOK || apiKey == "" {
-		writeError(w, http.StatusInternalServerError, "provider key not configured")
+		writeAnthropicError(w, http.StatusInternalServerError, "api_error", "provider key not configured")
 		return
 	}
 	canReq.Model = model.UpstreamModelID
 
 	canProv, isCanonical := prov.(provider.CanonicalProvider)
 	if !isCanonical {
-		writeError(w, http.StatusInternalServerError, "provider does not support canonical IR")
+		writeAnthropicError(w, http.StatusInternalServerError, "api_error", "provider does not support canonical IR")
 		return
 	}
 
+	// Tokenize prompt for cost reservation
 	requestID := uuid.New()
 	tk, err := h.Tokenizers.Get(model.UpstreamProvider)
 	if err != nil {
 		log.Printf("ERROR: no tokenizer for provider %q: %v", model.UpstreamProvider, err)
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeAnthropicError(w, http.StatusInternalServerError, "api_error", "internal error")
 		return
 	}
 	estPromptTokens64, terr := tk.CountPromptTokens(ctx, model.UpstreamModelID, canonicalMessagesToTokenizerMessages(canReq))
 	if terr != nil {
 		estPromptTokens64 = canonicalCharCount(canReq) / 4
 	}
-
 	maxCost := billing.CalculateCost(int64(estPromptTokens64), int64(req.MaxTokens),
 		model.InputCentsPerMillionTokens, model.OutputCentsPerMillionTokens, model.MarkupPct)
 	if err := h.Billing.Reserve(ctx, result.UserID, requestID, maxCost.TotalCents); err != nil {
 		if errors.Is(err, billing.ErrInsufficientCredits) {
-			writeError(w, http.StatusPaymentRequired, "insufficient credits")
+			writeAnthropicError(w, http.StatusPaymentRequired, "billing_error", "insufficient credits")
 		} else {
 			log.Printf("ERROR: reservation failed: %v", err)
-			writeError(w, http.StatusInternalServerError, "internal error")
+			writeAnthropicError(w, http.StatusInternalServerError, "api_error", "internal error")
 		}
 		return
 	}
 
 	if req.Stream {
-		h.handleStream(ctx, cleanupCtx, w, canProv, apiKey, model, result, requestID, started, maxCost, canReq, req.Model)
+		h.handleStream(ctx, cleanupCtx, w, canProv, apiKey, model, result, requestID, started, maxCost, canReq)
 		return
 	}
 
@@ -145,11 +161,11 @@ func (h *OpenAIHandler) ChatCompletions(w http.ResponseWriter, r *http.Request) 
 		errMsg := err.Error()
 		h.Reactor.Push(logging.RequestLogEntry{
 			ID: requestID, UserID: result.UserID, APIKeyID: result.APIKeyID,
-			APISurface: "openai", UpstreamProvider: model.UpstreamProvider, UpstreamModel: model.UpstreamModelID,
+			APISurface: "anthropic", UpstreamProvider: model.UpstreamProvider, UpstreamModel: model.UpstreamModelID,
 			ModelAlias: model.Alias, Streaming: false, Status: "provider_error",
 			ErrorMessage: &errMsg, LatencyMs: &latency, CreatedAt: started, CompletedAt: &now,
 		})
-		writeError(w, http.StatusBadGateway, "upstream provider error")
+		writeAnthropicError(w, http.StatusBadGateway, "api_error", "upstream provider error")
 		return
 	}
 
@@ -157,18 +173,19 @@ func (h *OpenAIHandler) ChatCompletions(w http.ResponseWriter, r *http.Request) 
 		model.InputCentsPerMillionTokens, model.OutputCentsPerMillionTokens, model.MarkupPct)
 	_ = h.Billing.Finalize(cleanupCtx, result.UserID, requestID, maxCost.TotalCents, actual.TotalCents)
 
-	now := time.Now()
-	out := toai.FromCanonical("chatcmpl-"+requestID.String(), req.Model, now.Unix(), *resp)
+	// Build Anthropic response
+	out := tanthropic.FromCanonical("msg_"+requestID.String(), model.Alias, *resp)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(out)
 
+	now := time.Now()
 	latency := int(time.Since(started).Milliseconds())
 	pt, ct := resp.Usage.PromptTokens, resp.Usage.CompletionTokens
 	h.Reactor.Push(logging.RequestLogEntry{
 		ID:                requestID,
 		UserID:            result.UserID,
 		APIKeyID:          result.APIKeyID,
-		APISurface:        "openai",
+		APISurface:        "anthropic",
 		UpstreamProvider:  model.UpstreamProvider,
 		UpstreamModel:     model.UpstreamModelID,
 		ModelAlias:        model.Alias,
@@ -186,7 +203,7 @@ func (h *OpenAIHandler) ChatCompletions(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (h *OpenAIHandler) handleStream(
+func (h *AnthropicHandler) handleStream(
 	ctx, cleanupCtx context.Context,
 	w http.ResponseWriter,
 	prov provider.CanonicalProvider,
@@ -197,13 +214,12 @@ func (h *OpenAIHandler) handleStream(
 	started time.Time,
 	maxCost billing.Cost,
 	req canonical.Request,
-	modelAlias string,
 ) {
 	reader, err := prov.SendCanonicalStream(ctx, req, apiKey)
 	if err != nil {
 		_ = h.Billing.Finalize(cleanupCtx, result.UserID, requestID, maxCost.TotalCents, 0)
 		log.Printf("ERROR: stream open failed: %v", err)
-		writeError(w, http.StatusBadGateway, "upstream provider error")
+		writeAnthropicError(w, http.StatusBadGateway, "api_error", "upstream provider error")
 		return
 	}
 	defer reader.Close()
@@ -211,11 +227,20 @@ func (h *OpenAIHandler) handleStream(
 	sse := stream.NewWriter(w)
 	if sse == nil {
 		_ = h.Billing.Finalize(cleanupCtx, result.UserID, requestID, maxCost.TotalCents, 0)
-		writeError(w, http.StatusInternalServerError, "response writer does not support streaming")
+		writeAnthropicError(w, http.StatusInternalServerError, "api_error", "response writer does not support streaming")
 		return
 	}
 
-	mapper := toai.NewStreamMapper("chatcmpl-"+requestID.String(), modelAlias, time.Now().Unix())
+	mapper := tanthropic.NewStreamMapper("msg_"+requestID.String(), model.Alias)
+
+	// We need to send message_start with prompt_tokens — wait for the first
+	// usage signal from the stream or for the StreamEventStop. To avoid
+	// blocking message_start unnecessarily, send it eagerly with 0 prompt
+	// tokens (Anthropic's clients accept this; the real count arrives in
+	// message_delta).
+	for _, fe := range mapper.Start(0) {
+		_ = sse.SendFrame(fe.Event, fe.Data)
+	}
 
 	streamStatus := "success"
 	streamedChars := 0
@@ -228,11 +253,11 @@ func (h *OpenAIHandler) handleStream(
 		if evt.Usage != nil {
 			finalUsage = evt.Usage
 		}
-		if chunk := mapper.Map(evt); chunk != nil {
-			if err := sse.SendJSON(chunk); err != nil {
+		for _, fe := range mapper.Map(evt) {
+			if err := sse.SendFrame(fe.Event, fe.Data); err != nil {
 				log.Printf("ERROR: sse write: %v", err)
 				streamStatus = "cancelled"
-				break
+				goto streamDone
 			}
 		}
 		if recvErr == io.EOF {
@@ -244,8 +269,7 @@ func (h *OpenAIHandler) handleStream(
 			break
 		}
 	}
-
-	_ = sse.SendDone()
+streamDone:
 
 	var promptTokens, completionTokens int
 	if finalUsage != nil {
@@ -263,7 +287,7 @@ func (h *OpenAIHandler) handleStream(
 	pt, ct := promptTokens, completionTokens
 	h.Reactor.Push(logging.RequestLogEntry{
 		ID: requestID, UserID: result.UserID, APIKeyID: result.APIKeyID,
-		APISurface: "openai", UpstreamProvider: model.UpstreamProvider,
+		APISurface: "anthropic", UpstreamProvider: model.UpstreamProvider,
 		UpstreamModel: model.UpstreamModelID, ModelAlias: model.Alias,
 		PromptTokens: &pt, CompletionTokens: &ct,
 		InputCostCents: int(actual.InputCents), OutputCostCents: int(actual.OutputCents),
@@ -271,4 +295,45 @@ func (h *OpenAIHandler) handleStream(
 		Streaming: true, Status: streamStatus,
 		LatencyMs: &latency, CreatedAt: started, CompletedAt: &now,
 	})
+}
+
+// canonicalMessagesToTokenizerMessages flattens canonical messages into the
+// flat (role, text) shape that the tokenizer interface expects. Tool calls and
+// images are best-effort represented as text for prompt-cost estimation.
+func canonicalMessagesToTokenizerMessages(req canonical.Request) []tokenizer.Message {
+	var out []tokenizer.Message
+	if req.System != "" {
+		out = append(out, tokenizer.Message{Role: "system", Content: req.System})
+	}
+	for _, m := range req.Messages {
+		var text strings.Builder
+		for _, b := range m.Content {
+			switch b.Type {
+			case canonical.BlockText:
+				text.WriteString(b.Text)
+			case canonical.BlockToolUse:
+				text.WriteString(b.ToolName)
+				text.WriteString(" ")
+				text.Write(b.ToolInput)
+			case canonical.BlockToolResult:
+				text.WriteString(b.ToolResult)
+			case canonical.BlockImage:
+				// Tokenizers don't price image tokens well at the prompt level;
+				// 256 bytes is a heuristic placeholder.
+				text.WriteString("[image]")
+			}
+		}
+		out = append(out, tokenizer.Message{Role: string(m.Role), Content: text.String()})
+	}
+	return out
+}
+
+func canonicalCharCount(req canonical.Request) int {
+	n := len(req.System)
+	for _, m := range req.Messages {
+		for _, b := range m.Content {
+			n += len(b.Text) + len(b.ToolResult) + len(b.ToolName) + len(b.ToolInput)
+		}
+	}
+	return n
 }
