@@ -71,10 +71,11 @@ func (a *Adapter) Send(ctx context.Context, req provider.Request, apiKey string)
 	if apiKey == "" {
 		return nil, errors.New("gemini api key not configured")
 	}
-	url := fmt.Sprintf("%s/%s:generateContent?key=%s", baseURL, req.Model, apiKey)
+	url := fmt.Sprintf("%s/%s:generateContent", baseURL, req.Model)
 	buf, _ := json.Marshal(buildBody(req))
 	r, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(buf))
 	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-Goog-Api-Key", apiKey)
 	resp, err := a.HTTP.Do(r)
 	if err != nil {
 		return nil, err
@@ -106,10 +107,11 @@ func (a *Adapter) SendStream(ctx context.Context, req provider.Request, apiKey s
 	if apiKey == "" {
 		return nil, errors.New("gemini api key not configured")
 	}
-	url := fmt.Sprintf("%s/%s:streamGenerateContent?alt=sse&key=%s", baseURL, req.Model, apiKey)
+	url := fmt.Sprintf("%s/%s:streamGenerateContent?alt=sse", baseURL, req.Model)
 	buf, _ := json.Marshal(buildBody(req))
 	r, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(buf))
 	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-Goog-Api-Key", apiKey)
 	resp, err := a.HTTP.Do(r)
 	if err != nil {
 		return nil, err

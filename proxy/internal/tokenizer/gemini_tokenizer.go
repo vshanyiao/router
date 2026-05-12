@@ -53,9 +53,10 @@ func (t *GeminiTokenizer) CountPromptTokens(ctx context.Context, model string, m
 		})
 	}
 	buf, _ := json.Marshal(body)
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:countTokens?key=%s", model, t.APIKey)
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:countTokens", model)
 	req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(buf))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Goog-Api-Key", t.APIKey)
 	resp, err := t.HTTP.Do(req)
 	if err != nil {
 		return 0, err
