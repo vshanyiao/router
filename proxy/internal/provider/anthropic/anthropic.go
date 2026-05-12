@@ -16,11 +16,16 @@ import (
 
 const apiURL = "https://api.anthropic.com/v1/messages"
 
+// httpClient has no Timeout — streaming requests can legitimately last
+// several minutes. Cancellation is driven by the request context instead.
+// Non-streaming requests should pass a context with timeout from the caller.
+var httpClient = &http.Client{}
+
 type Adapter struct {
 	HTTP *http.Client
 }
 
-func New() *Adapter { return &Adapter{HTTP: http.DefaultClient} }
+func New() *Adapter { return &Adapter{HTTP: httpClient} }
 
 type messageBody struct {
 	Model     string      `json:"model"`
@@ -115,7 +120,11 @@ func (a *Adapter) SendStream(ctx context.Context, req provider.Request, apiKey s
 		resp.Body.Close()
 		return nil, fmt.Errorf("anthropic: status %d: %s", resp.StatusCode, b)
 	}
-	return &anthropicStream{body: resp.Body, scanner: bufio.NewScanner(resp.Body)}, nil
+	scanner := bufio.NewScanner(resp.Body)
+	// Default scanner buffer is 64KB; a single content_block_delta with a long
+	// code block can easily exceed that and silently truncate the stream.
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	return &anthropicStream{body: resp.Body, scanner: scanner}, nil
 }
 
 type anthropicStream struct {

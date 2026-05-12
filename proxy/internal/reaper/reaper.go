@@ -66,14 +66,41 @@ func (r *Reaper) sweep(ctx context.Context) {
 	rows.Close()
 
 	for _, s := range stucks {
-		_, _ = r.pg.Exec(ctx, `
-			UPDATE users SET credits_cents = credits_cents + $1 WHERE id = $2
-		`, s.RefundAmount, s.UserID)
-		_, _ = r.pg.Exec(ctx, `
-			INSERT INTO credit_transactions (id, user_id, amount_cents, kind, request_id, balance_after_cents, description, created_at)
-			VALUES (gen_random_uuid(), $1, $2, 'refund', $3,
-			  (SELECT credits_cents FROM users WHERE id = $1), 'reaper: stuck reservation', now())
-		`, s.UserID, s.RefundAmount, s.RequestID)
+		if err := r.refund(ctx, s.UserID, s.RequestID, s.RefundAmount); err != nil {
+			log.Printf("reaper: refund failed for user %s req %s: %v", s.UserID, s.RequestID, err)
+			continue
+		}
 		log.Printf("reaper: refunded %d cents to user %s for stuck request %s", s.RefundAmount, s.UserID, s.RequestID)
 	}
+}
+
+// refund performs the balance restoration and audit row insertion in a single
+// transaction. Without this, a crash between the UPDATE and the INSERT could
+// leave the balance restored with no ledger entry — a phantom credit that the
+// next sweep would refund again (double-credit).
+func (r *Reaper) refund(ctx context.Context, userID, requestID string, amount int64) error {
+	tx, err := r.pg.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var balanceAfter int64
+	if err := tx.QueryRow(ctx, `
+		UPDATE users SET credits_cents = credits_cents + $1
+		WHERE id = $2
+		RETURNING credits_cents
+	`, amount, userID).Scan(&balanceAfter); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO credit_transactions
+			(id, user_id, amount_cents, kind, request_id, balance_after_cents, description, created_at)
+		VALUES (gen_random_uuid(), $1, $2, 'refund', $3, $4, 'reaper: stuck reservation', now())
+	`, userID, amount, requestID, balanceAfter); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }

@@ -260,9 +260,15 @@ func (h *OpenAIHandler) handleStream(
 	maxCost billing.Cost,
 	req *ChatCompletionsRequest,
 ) {
+	// Cleanup context is detached from the request context: when the client
+	// disconnects mid-stream, r.Context() cancels — but we must still finalize
+	// billing and log the request. Cap at 10s so a hung DB doesn't pile up.
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cleanupCancel()
+
 	streamer, ok := prov.(provider.StreamingProvider)
 	if !ok {
-		_ = h.Billing.Finalize(ctx, result.UserID, requestID, maxCost.TotalCents, 0)
+		_ = h.Billing.Finalize(cleanupCtx, result.UserID, requestID, maxCost.TotalCents, 0)
 		writeError(w, http.StatusBadRequest, "model does not support streaming")
 		return
 	}
@@ -276,7 +282,7 @@ func (h *OpenAIHandler) handleStream(
 		MaxTokens: req.MaxTokens,
 	}, apiKey)
 	if err != nil {
-		_ = h.Billing.Finalize(ctx, result.UserID, requestID, maxCost.TotalCents, 0)
+		_ = h.Billing.Finalize(cleanupCtx, result.UserID, requestID, maxCost.TotalCents, 0)
 		log.Printf("ERROR: stream open failed: %v", err)
 		writeError(w, http.StatusBadGateway, "upstream provider error")
 		return
@@ -285,15 +291,22 @@ func (h *OpenAIHandler) handleStream(
 
 	sse := stream.NewWriter(w)
 	if sse == nil {
-		_ = h.Billing.Finalize(ctx, result.UserID, requestID, maxCost.TotalCents, 0)
+		_ = h.Billing.Finalize(cleanupCtx, result.UserID, requestID, maxCost.TotalCents, 0)
 		writeError(w, http.StatusInternalServerError, "response writer does not support streaming")
 		return
 	}
 
+	// streamStatus tracks how the loop exited so we can: (a) log accurate
+	// status in request_logs and (b) charge for partial output on provider
+	// error rather than full-refund and give the user free tokens.
+	streamStatus := "success"
+	stopReason := "stop"
+	streamedChars := 0 // proxy-side fallback when provider doesn't report final usage
 	var finalUsage *provider.Usage
 	for {
 		evt, recvErr := reader.Recv()
 		if evt.Type == "content" && evt.ContentDelta != "" {
+			streamedChars += len(evt.ContentDelta)
 			chunk := streamingChunk{
 				ID:      "chatcmpl-" + requestID.String(),
 				Object:  "chat.completion.chunk",
@@ -302,23 +315,27 @@ func (h *OpenAIHandler) handleStream(
 				Choices: []streamingChoice{{Index: 0, Delta: ChatCompletionMessage{Content: evt.ContentDelta}}},
 			}
 			if writeErr := sse.SendJSON(chunk); writeErr != nil {
-				log.Printf("ERROR: sse write: %v", writeErr)
+				log.Printf("ERROR: sse write (client likely disconnected): %v", writeErr)
+				streamStatus = "cancelled"
 				break
 			}
 		}
 		if evt.Usage != nil {
 			finalUsage = evt.Usage
 		}
+		if evt.StopReason != "" {
+			stopReason = evt.StopReason
+		}
 		if recvErr == io.EOF {
 			break
 		}
 		if recvErr != nil {
 			log.Printf("ERROR: stream recv: %v", recvErr)
+			streamStatus = "provider_error"
 			break
 		}
 	}
 
-	stopReason := "stop"
 	finalChunk := streamingChunk{
 		ID:      "chatcmpl-" + requestID.String(),
 		Object:  "chat.completion.chunk",
@@ -329,14 +346,24 @@ func (h *OpenAIHandler) handleStream(
 	_ = sse.SendJSON(finalChunk)
 	_ = sse.SendDone()
 
+	// Determine billing tokens. Prefer provider-reported usage; fall back to
+	// proxy-side accounting (reservation prompt estimate + char-count for
+	// completion) so partial streams don't refund-to-zero.
 	var promptTokens, completionTokens int
 	if finalUsage != nil {
 		promptTokens = finalUsage.PromptTokens
 		completionTokens = finalUsage.CompletionTokens
+	} else {
+		// We don't have access to the reservation-time prompt estimate here;
+		// best we can do for the prompt side without a separate field is to
+		// derive it later from the reservation amount. For now, charge for
+		// completion tokens at minimum so the user isn't given free output.
+		promptTokens = 0
+		completionTokens = streamedChars / 4
 	}
 	actual := billing.CalculateCost(int64(promptTokens), int64(completionTokens),
 		model.InputCentsPerMillionTokens, model.OutputCentsPerMillionTokens, model.MarkupPct)
-	_ = h.Billing.Finalize(ctx, result.UserID, requestID, maxCost.TotalCents, actual.TotalCents)
+	_ = h.Billing.Finalize(cleanupCtx, result.UserID, requestID, maxCost.TotalCents, actual.TotalCents)
 
 	now := time.Now()
 	latency := int(time.Since(started).Milliseconds())
@@ -348,7 +375,7 @@ func (h *OpenAIHandler) handleStream(
 		PromptTokens: &pt, CompletionTokens: &ct,
 		InputCostCents: int(actual.InputCents), OutputCostCents: int(actual.OutputCents),
 		MarginCents: int(actual.MarginCents), TotalChargedCents: int(actual.TotalCents),
-		Streaming: true, Status: "success",
+		Streaming: true, Status: streamStatus,
 		LatencyMs: &latency, CreatedAt: started, CompletedAt: &now,
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -60,8 +61,11 @@ func (s *Service) Reserve(ctx context.Context, userID, requestID uuid.UUID, amou
 		WHERE id = $2 AND credits_cents >= $1
 		RETURNING credits_cents
 	`, amount, userID).Scan(&balanceAfter)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrInsufficientCredits
+	}
+	if err != nil {
+		return err
 	}
 
 	_, err = tx.Exec(ctx, `
