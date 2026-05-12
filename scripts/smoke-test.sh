@@ -41,6 +41,75 @@ curl -sS -N -X POST http://localhost:8080/v1/chat/completions \
   }' | head -30
 
 echo
+echo "=== Anthropic surface + Anthropic provider (native, non-streaming) ==="
+curl -sS -X POST http://localhost:8080/v1/messages \
+  -H "x-api-key: $API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-haiku-4-5",
+    "max_tokens": 40,
+    "messages": [{"role":"user","content":"Say hi in two words."}]
+  }' | jq '{stop_reason, content: .content[0].text}'
+
+echo
+echo "=== Anthropic surface + OAI provider (cross-format) ==="
+curl -sS -X POST http://localhost:8080/v1/messages \
+  -H "x-api-key: $API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "openai/gpt-4o-mini",
+    "max_tokens": 40,
+    "messages": [{"role":"user","content":"Say hi in two words."}]
+  }' | jq '{stop_reason, content: .content[0].text}'
+
+echo
+echo "=== Anthropic surface + Gemini provider (cross-format) ==="
+curl -sS -X POST http://localhost:8080/v1/messages \
+  -H "x-api-key: $API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "google/gemini-2.5-flash",
+    "max_tokens": 40,
+    "messages": [{"role":"user","content":"Say hi in two words."}]
+  }' | jq '{stop_reason, content: .content[0].text}'
+
+echo
+echo "=== OAI surface + Anthropic provider tool call ==="
+curl -sS -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-haiku-4-5",
+    "messages": [{"role":"user","content":"What is the weather in Paris?"}],
+    "tools": [{
+      "type": "function",
+      "function": {
+        "name": "get_weather",
+        "description": "Get current weather for a city",
+        "parameters": {"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}
+      }
+    }],
+    "max_tokens": 200
+  }' | jq '.choices[0].message.tool_calls[0] // .choices[0].message.content'
+
+echo
+echo "=== OAI surface + Gemini vision ==="
+curl -sS -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "google/gemini-2.5-flash",
+    "messages": [{"role":"user","content":[
+      {"type":"text","text":"What color is this image? Answer in one word."},
+      {"type":"image_url","image_url":{"url":"https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Red_square.png/120px-Red_square.png"}}
+    ]}],
+    "max_tokens": 30
+  }' | jq '.choices[0].message.content'
+
+echo
 echo "=== Asking DB for the request log (after 1s drain) ==="
 sleep 1
 docker compose exec -T postgres psql -U app -d maas -c "
