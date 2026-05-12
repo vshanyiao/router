@@ -29,6 +29,18 @@ echo "Status: $(jq -r '.choices[0].finish_reason' /tmp/maas-response.json)"
 echo "Tokens: $(jq -r '.usage.prompt_tokens' /tmp/maas-response.json) in / $(jq -r '.usage.completion_tokens' /tmp/maas-response.json) out"
 
 echo
+echo "=== Streaming chat completion request ==="
+curl -sS -N -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-haiku-4-5",
+    "messages": [{"role":"user","content":"Count from 1 to 5, one per line."}],
+    "max_tokens": 40,
+    "stream": true
+  }' | head -30
+
+echo
 echo "=== Asking DB for the request log (after 1s drain) ==="
 sleep 1
 docker compose exec -T postgres psql -U app -d maas -c "

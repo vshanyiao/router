@@ -21,7 +21,10 @@ export async function POST(req: NextRequest) {
 
   const existing = await prisma.user.findUnique({ where: { email } })
   if (existing) {
-    return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
+    // Don't disclose account existence. Return the same response shape as a
+    // successful signup. The attacker can't tell whether an account exists,
+    // and the legitimate user (who forgot they signed up) will retry login.
+    return NextResponse.json({ ok: true, message: 'Check your email for the verification link.' })
   }
 
   const passwordHash = await bcrypt.hash(password, 12)

@@ -21,6 +21,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <nav className="mt-6 space-y-1 text-sm">
           <Link href="/dashboard" className="block rounded px-3 py-2 hover:bg-gray-100">Overview</Link>
           <Link href="/dashboard/keys" className="block rounded px-3 py-2 hover:bg-gray-100">API Keys</Link>
+          <Link href="/dashboard/usage" className="block rounded px-3 py-2 hover:bg-gray-100">Usage</Link>
         </nav>
       </aside>
       <main className="flex-1 p-8">{children}</main>
