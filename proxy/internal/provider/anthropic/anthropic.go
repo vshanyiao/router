@@ -115,7 +115,11 @@ func (a *Adapter) SendStream(ctx context.Context, req provider.Request, apiKey s
 		resp.Body.Close()
 		return nil, fmt.Errorf("anthropic: status %d: %s", resp.StatusCode, b)
 	}
-	return &anthropicStream{body: resp.Body, scanner: bufio.NewScanner(resp.Body)}, nil
+	scanner := bufio.NewScanner(resp.Body)
+	// Default scanner buffer is 64KB; a single content_block_delta with a long
+	// code block can easily exceed that and silently truncate the stream.
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	return &anthropicStream{body: resp.Body, scanner: scanner}, nil
 }
 
 type anthropicStream struct {
