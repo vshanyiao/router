@@ -36,7 +36,11 @@ providers.push(Credentials({
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma) as any,
-  session: { strategy: 'database' },
+  // NextAuth v5 requires JWT session strategy when the Credentials provider
+  // is in use. We trade the instant-revocation property of DB sessions for
+  // Credentials compatibility; the proxy still picks up admin suspensions
+  // within 30s via the Redis auth cache TTL (see proxy/internal/auth/auth.go).
+  session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
   providers,
   callbacks: {
@@ -54,6 +58,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
       return true
+    },
+    // JWT strategy doesn't auto-populate session.user.id. We persist the
+    // database user id into the token on sign-in, then surface it on the
+    // session object so server-side handlers can do `session.user.id`.
+    async jwt({ token, user }) {
+      if (user?.id) token.sub = user.id
+      return token
+    },
+    async session({ session, token }) {
+      if (session.user && token.sub) {
+        (session.user as { id?: string }).id = token.sub
+      }
+      return session
     },
   },
   events: {
