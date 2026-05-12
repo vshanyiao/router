@@ -1,6 +1,10 @@
 package provider
 
-import "context"
+import (
+	"context"
+
+	"github.com/admin/maas-router/proxy/internal/canonical"
+)
 
 type Request struct {
 	Model     string
@@ -52,4 +56,14 @@ type StreamReader interface {
 type StreamingProvider interface {
 	Provider
 	SendStream(ctx context.Context, req Request, apiKey string) (StreamReader, error)
+}
+
+// CanonicalProvider sends canonical.Request and returns either a complete
+// canonical.Response or a canonical.StreamReader. Adapters that support
+// tool calls / vision implement this; the older Provider interface is kept
+// for the fast path where the surface format matches the provider format
+// (currently unused — Phase 2 routes everything through canonical).
+type CanonicalProvider interface {
+	SendCanonical(ctx context.Context, req canonical.Request, apiKey string) (*canonical.Response, error)
+	SendCanonicalStream(ctx context.Context, req canonical.Request, apiKey string) (canonical.StreamReader, error)
 }
