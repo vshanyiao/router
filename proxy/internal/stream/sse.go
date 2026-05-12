@@ -47,3 +47,14 @@ func (s *Writer) SendDone() error {
 	s.flusher.Flush()
 	return nil
 }
+
+// SendFrame writes a named-event SSE frame (used by the Anthropic surface for
+// typed events: `event: message_start\ndata: {...}\n\n`). The data argument
+// should already be JSON-marshaled.
+func (s *Writer) SendFrame(event, data string) error {
+	if _, err := fmt.Fprintf(s.w, "event: %s\ndata: %s\n\n", event, data); err != nil {
+		return err
+	}
+	s.flusher.Flush()
+	return nil
+}
