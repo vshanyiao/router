@@ -73,6 +73,7 @@ async function main() {
       upstreamModelId: 'o1',
       contextWindow: 200000,
       supportsTools: false,
+      supportsVision: false,
       inputCentsPerMillionTokens: 1500,
       outputCentsPerMillionTokens: 6000,
       tags: ['reasoning', 'frontier'],
@@ -132,7 +133,10 @@ async function main() {
   for (const m of additionalModels) {
     await prisma.modelCatalog.upsert({
       where: { alias: m.alias },
-      update: {},
+      update: {
+        supportsTools: m.supportsTools ?? true,
+        supportsVision: m.supportsVision ?? true,
+      },
       create: {
         alias: m.alias,
         displayName: m.displayName,
@@ -141,7 +145,7 @@ async function main() {
         contextWindow: m.contextWindow,
         supportsStreaming: true,
         supportsTools: m.supportsTools ?? true,
-        supportsVision: true,
+        supportsVision: m.supportsVision ?? true,
         inputCentsPerMillionTokens: m.inputCentsPerMillionTokens,
         outputCentsPerMillionTokens: m.outputCentsPerMillionTokens,
         markupPct: 18,
