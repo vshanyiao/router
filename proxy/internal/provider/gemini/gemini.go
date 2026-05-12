@@ -129,10 +129,40 @@ func (a *Adapter) SendStream(ctx context.Context, req provider.Request, apiKey s
 }
 
 type geminiStream struct {
-	body  io.ReadCloser
-	buf   []byte
-	usage provider.Usage
-	done  bool
+	body   io.ReadCloser
+	buf    []byte
+	usage  provider.Usage
+	done   bool
+	atEOF  bool // body returned io.EOF; finish draining buf then emit stop
+}
+
+// parseEvent extracts content delta from one SSE event payload (the bytes
+// between two `\n\n` boundaries). Returns the content text (or "" if the
+// event had no content) and updates usage in-place when present.
+func (s *geminiStream) parseEvent(chunk []byte) string {
+	var data []byte
+	for _, line := range bytes.Split(chunk, []byte("\n")) {
+		if bytes.HasPrefix(line, []byte("data: ")) {
+			data = append(data, line[len("data: "):]...)
+		}
+	}
+	if len(data) == 0 {
+		return ""
+	}
+	var partial genResp
+	if err := json.Unmarshal(data, &partial); err != nil {
+		return ""
+	}
+	if partial.UsageMetadata.PromptTokenCount > 0 {
+		s.usage.PromptTokens = partial.UsageMetadata.PromptTokenCount
+	}
+	if partial.UsageMetadata.CandidatesTokenCount > 0 {
+		s.usage.CompletionTokens = partial.UsageMetadata.CandidatesTokenCount
+	}
+	if len(partial.Candidates) > 0 && len(partial.Candidates[0].Content.Parts) > 0 {
+		return partial.Candidates[0].Content.Parts[0].Text
+	}
+	return ""
 }
 
 func (s *geminiStream) Recv() (provider.StreamEvent, error) {
@@ -141,49 +171,43 @@ func (s *geminiStream) Recv() (provider.StreamEvent, error) {
 	}
 	tmp := make([]byte, 1024)
 	for {
-		// Look for complete SSE event in buffer (separated by \n\n)
+		// Look for a complete event in the buffer first.
 		if idx := bytes.Index(s.buf, []byte("\n\n")); idx >= 0 {
 			chunk := s.buf[:idx]
 			s.buf = append([]byte{}, s.buf[idx+2:]...)
-
-			var data []byte
-			for _, line := range bytes.Split(chunk, []byte("\n")) {
-				if bytes.HasPrefix(line, []byte("data: ")) {
-					data = append(data, line[len("data: "):]...)
-				}
-			}
-			if len(data) == 0 {
-				continue
-			}
-			var partial genResp
-			if err := json.Unmarshal(data, &partial); err != nil {
-				continue
-			}
-			if partial.UsageMetadata.PromptTokenCount > 0 {
-				s.usage.PromptTokens = partial.UsageMetadata.PromptTokenCount
-			}
-			if partial.UsageMetadata.CandidatesTokenCount > 0 {
-				s.usage.CompletionTokens = partial.UsageMetadata.CandidatesTokenCount
-			}
-			if len(partial.Candidates) > 0 && len(partial.Candidates[0].Content.Parts) > 0 {
-				text := partial.Candidates[0].Content.Parts[0].Text
-				if text != "" {
-					return provider.StreamEvent{Type: "content", ContentDelta: text}, nil
-				}
+			if text := s.parseEvent(chunk); text != "" {
+				return provider.StreamEvent{Type: "content", ContentDelta: text}, nil
 			}
 			continue
 		}
-		// Buffer doesn't have a complete event — read more from body
+		// Buffer has no complete event. If we already saw EOF, try to parse
+		// any tailing event without trailing `\n\n` (some servers omit it),
+		// then emit stop. This is the fix for C1 — we MUST drain remaining
+		// data after EOF, because Gemini's usageMetadata event arrives in
+		// the same Read that returns EOF.
+		if s.atEOF {
+			if len(s.buf) > 0 {
+				chunk := s.buf
+				s.buf = nil
+				if text := s.parseEvent(chunk); text != "" {
+					return provider.StreamEvent{Type: "content", ContentDelta: text}, nil
+				}
+			}
+			s.done = true
+			u := s.usage
+			return provider.StreamEvent{Type: "stop", StopReason: "stop", Usage: &u}, io.EOF
+		}
+		// Read more from body. (n>0, EOF) is legal HTTP/1.1 end-of-stream —
+		// we set atEOF and loop back to drain the buffer.
 		n, err := s.body.Read(tmp)
 		if n > 0 {
 			s.buf = append(s.buf, tmp[:n]...)
 		}
+		if err == io.EOF {
+			s.atEOF = true
+			continue
+		}
 		if err != nil {
-			if err == io.EOF {
-				s.done = true
-				u := s.usage
-				return provider.StreamEvent{Type: "stop", StopReason: "stop", Usage: &u}, io.EOF
-			}
 			return provider.StreamEvent{}, err
 		}
 	}
