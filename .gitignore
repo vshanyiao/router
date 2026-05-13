@@ -33,3 +33,4 @@ proxy/bin/
 # IDE swap files
 *.swp
 *.swo
+.claude/
