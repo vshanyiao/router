@@ -358,32 +358,30 @@ type canonicalStream struct {
 }
 
 func (s *canonicalStream) Recv() (canonical.StreamEvent, error) {
-	// If we already emitted the stop event, signal EOF.
 	if s.stopEmitted {
 		return canonical.StreamEvent{}, io.EOF
-	}
-
-	// Drain any pending stop event (from a previous EOF on the source).
-	if s.pendingStop != nil {
-		ev := *s.pendingStop
-		s.pendingStop = nil
-		s.stopEmitted = true
-		return ev, io.EOF
 	}
 
 	for {
 		resp, err := s.src.Recv()
 		if err == io.EOF {
-			// Source exhausted without a finish_reason chunk — emit a bare stop.
-			stopEv := canonical.StreamEvent{Type: canonical.StreamEventStop, StopReason: "stop"}
+			// Source exhausted. If we have a pending stop (from a previous
+			// finish_reason chunk), emit it now — possibly with usage we
+			// accumulated from the trailing usage-only chunk.
+			if s.pendingStop != nil {
+				ev := *s.pendingStop
+				s.pendingStop = nil
+				s.stopEmitted = true
+				return ev, io.EOF
+			}
+			// No finish_reason was ever seen — emit a bare stop.
 			s.stopEmitted = true
-			return stopEv, io.EOF
+			return canonical.StreamEvent{Type: canonical.StreamEventStop, StopReason: "stop"}, io.EOF
 		}
 		if err != nil {
 			return canonical.StreamEvent{Type: canonical.StreamEventError, Error: &canonical.ErrorInfo{Message: err.Error()}}, err
 		}
 
-		// Accumulate usage if present.
 		var usagePtr *canonical.Usage
 		if resp.Usage != nil {
 			usagePtr = &canonical.Usage{
@@ -392,9 +390,15 @@ func (s *canonicalStream) Recv() (canonical.StreamEvent, error) {
 			}
 		}
 
+		// Usage-only chunk (OAI sends this AFTER the finish_reason chunk when
+		// StreamOptions.IncludeUsage is true). Attach to pendingStop if we
+		// already saw finish_reason; otherwise emit a Usage event.
 		if len(resp.Choices) == 0 {
-			// usage-only chunk — emit usage event if we have usage, otherwise skip.
 			if usagePtr != nil {
+				if s.pendingStop != nil {
+					s.pendingStop.Usage = usagePtr
+					continue
+				}
 				return canonical.StreamEvent{Type: canonical.StreamEventUsage, Usage: usagePtr}, nil
 			}
 			continue
@@ -403,16 +407,17 @@ func (s *canonicalStream) Recv() (canonical.StreamEvent, error) {
 		choice := resp.Choices[0]
 		delta := choice.Delta
 
-		// Finish reason chunk.
+		// Finish reason chunk. Save the stop event but DON'T emit it yet —
+		// we expect a usage chunk to follow (when IncludeUsage was set). The
+		// stop event is emitted on the next iteration when src returns EOF
+		// (or immediately if the source closes after the finish_reason chunk).
 		if choice.FinishReason != "" {
-			stopReason := mapFinishReason(string(choice.FinishReason))
-			ev := canonical.StreamEvent{
+			s.pendingStop = &canonical.StreamEvent{
 				Type:       canonical.StreamEventStop,
-				StopReason: stopReason,
+				StopReason: mapFinishReason(string(choice.FinishReason)),
 				Usage:      usagePtr,
 			}
-			s.stopEmitted = true
-			return ev, io.EOF
+			continue
 		}
 
 		// Content delta.
@@ -432,7 +437,6 @@ func (s *canonicalStream) Recv() (canonical.StreamEvent, error) {
 			}
 
 			if tc.ID != "" && tc.Function.Name != "" {
-				// Start of a new tool call.
 				s.toolIndexToID[idx] = tc.ID
 				return canonical.StreamEvent{
 					Type:         canonical.StreamEventToolCallStart,

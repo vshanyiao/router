@@ -3,6 +3,7 @@
 package anthropic
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -127,7 +128,16 @@ func parseContent(raw json.RawMessage) ([]canonical.ContentBlock, error) {
 			if p.Source.Type == "url" {
 				out = append(out, canonical.ImageBlock(p.Source.URL, p.Source.MediaType))
 			} else if p.Source.Type == "base64" {
-				out = append(out, canonical.ImageDataBlock([]byte(p.Source.Data), p.Source.MediaType))
+				// Anthropic delivers image bytes pre-encoded as base64 in source.data.
+				// Decode to raw bytes here so downstream providers can re-encode as
+				// they need (OAI inlines as data: URL; Gemini wants base64 again;
+				// Anthropic also wants base64). Storing the raw base64 string as
+				// []byte would cause double-encoding at every provider.
+				data, err := base64.StdEncoding.DecodeString(p.Source.Data)
+				if err != nil {
+					return nil, fmt.Errorf("image source.data invalid base64: %w", err)
+				}
+				out = append(out, canonical.ImageDataBlock(data, p.Source.MediaType))
 			}
 		case "tool_use":
 			out = append(out, canonical.ToolUseBlock(p.ID, p.Name, p.Input))

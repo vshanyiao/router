@@ -82,6 +82,10 @@ func (m *StreamMapper) Map(evt canonical.StreamEvent) []FrameEvent {
 		}
 		b, _ := json.Marshal(payload)
 		out = append(out, FrameEvent{Event: "content_block_delta", Data: string(b)})
+	case canonical.StreamEventToolCallStop:
+		// Close the open tool_use block so the wire format has the matching
+		// content_block_stop the SDK clients expect.
+		out = append(out, m.closeBlock()...)
 	case canonical.StreamEventStop:
 		out = append(out, m.closeBlock()...)
 		payload := map[string]any{
@@ -107,10 +111,17 @@ func (m *StreamMapper) ensureBlock(kind string) []FrameEvent {
 	m.currentBlockIdx++
 	m.currentBlockKind = kind
 	m.currentBlockOpen = true
+	// Anthropic's text block start payload has no "text" field; text arrives
+	// only via subsequent content_block_delta events. Including text:"" is a
+	// wire-format violation that some strict clients reject.
+	cb := map[string]any{"type": kind}
+	if kind == "text" {
+		// no extra fields
+	}
 	payload := map[string]any{
-		"type":  "content_block_start",
-		"index": m.currentBlockIdx,
-		"content_block": map[string]any{"type": kind, "text": ""},
+		"type":          "content_block_start",
+		"index":         m.currentBlockIdx,
+		"content_block": cb,
 	}
 	b, _ := json.Marshal(payload)
 	return append(out, FrameEvent{Event: "content_block_start", Data: string(b)})

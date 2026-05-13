@@ -48,7 +48,10 @@ func mapStopReason(r string) string {
 	case "length":
 		return "max_tokens"
 	case "cancelled":
-		return "stop_sequence"
+		// Anthropic has no native concept of "client cancelled mid-stream".
+		// "stop_sequence" would imply a stop string was triggered (wrong);
+		// "end_turn" is the least misleading neutral signal.
+		return "end_turn"
 	default:
 		return "end_turn"
 	}

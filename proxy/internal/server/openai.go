@@ -245,6 +245,15 @@ func (h *OpenAIHandler) handleStream(
 		}
 	}
 
+	// On non-success exits (provider error or client disconnect), the canonical
+	// stream never emitted a StreamEventStop, so the mapper never wrote the
+	// final finish_reason chunk that OAI clients require. Emit a synthetic stop.
+	if streamStatus != "success" {
+		if chunk := mapper.Map(canonical.StreamEvent{Type: canonical.StreamEventStop, StopReason: "stop"}); chunk != nil {
+			_ = sse.SendJSON(chunk)
+		}
+	}
+
 	_ = sse.SendDone()
 
 	var promptTokens, completionTokens int
