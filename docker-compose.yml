@@ -66,11 +66,26 @@ services:
       REDIS_URL: redis://redis:6379
       HMAC_SERVER_SECRET: ${HMAC_SERVER_SECRET}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # Opt-in stripe-cli for forwarding webhook events to the local web service.
+  # Start with: `docker compose --profile billing up`
+  # The first `stripe listen` output prints a whsec_... value — copy that into
+  # `.env` as STRIPE_WEBHOOK_SECRET, then restart the web service.
+  stripe-cli:
+    image: stripe/stripe-cli:latest
+    profiles: ["billing"]
+    command: listen --forward-to web:3000/api/stripe-webhook
+    environment:
+      STRIPE_API_KEY: ${STRIPE_SECRET_KEY}
+    depends_on:
+      - web
 
 volumes:
   pgdata:
