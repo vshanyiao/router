@@ -12,6 +12,7 @@ const schema = z.object({
   HMAC_SERVER_SECRET: z.string().min(32),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  TURNSTILE_SECRET_KEY: z.string().optional(),
 })
 
 export const env = schema.parse(process.env)
