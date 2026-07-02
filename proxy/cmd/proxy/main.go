@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/admin/maas-router/proxy/internal/provider/anthropic"
 	"github.com/admin/maas-router/proxy/internal/provider/gemini"
 	"github.com/admin/maas-router/proxy/internal/provider/openai"
+	"github.com/admin/maas-router/proxy/internal/ratelimit"
 	"github.com/admin/maas-router/proxy/internal/reaper"
 	"github.com/admin/maas-router/proxy/internal/server"
 	"github.com/admin/maas-router/proxy/internal/storage"
@@ -86,6 +88,14 @@ func main() {
 		"google":    geminiKey,
 	}
 
+	limiter := ratelimit.New(rdb)
+	userRPM := 60
+	if v := os.Getenv("RATE_LIMIT_USER_RPM"); v != "" {
+		if n, perr := strconv.Atoi(v); perr == nil && n > 0 {
+			userRPM = n
+		}
+	}
+
 	handler := &server.OpenAIHandler{
 		Auth:       authSvc,
 		Billing:    billSvc,
@@ -94,6 +104,8 @@ func main() {
 		Tokenizers: tokReg,
 		Keys:       keys,
 		Reactor:    reactor,
+		RateLimit:  limiter,
+		UserRPM:    userRPM,
 	}
 
 	anthropicHandler := &server.AnthropicHandler{
@@ -104,6 +116,8 @@ func main() {
 		Tokenizers: tokReg,
 		Keys:       keys,
 		Reactor:    reactor,
+		RateLimit:  limiter,
+		UserRPM:    userRPM,
 	}
 
 	mux := http.NewServeMux()
