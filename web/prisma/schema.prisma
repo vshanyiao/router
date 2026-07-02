@@ -112,8 +112,12 @@ model PaymentIntent {
   stripeCheckoutSessionId  String?   @unique @map("stripe_checkout_session_id")
   amountCents              BigInt    @map("amount_cents")
   creditsAddedCents        BigInt    @map("credits_added_cents")
+  // Cumulative amount refunded so far, mirroring Stripe's charge.amount_refunded.
+  // Refund webhooks decrement the balance by the DELTA between the event's
+  // cumulative figure and this column — never the raw cumulative amount.
+  refundedCents            BigInt    @default(0) @map("refunded_cents")
   currency                 String    @default("usd")
-  status                   String
+  status                   String    // 'pending' | 'succeeded' | 'failed' | 'expired' | 'disputed'
   createdAt                DateTime  @default(now()) @map("created_at")
   completedAt              DateTime? @map("completed_at")
 
