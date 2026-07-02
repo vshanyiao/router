@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/admin/maas-router/proxy/internal/catalog"
 	"github.com/admin/maas-router/proxy/internal/logging"
 	"github.com/admin/maas-router/proxy/internal/provider"
+	"github.com/admin/maas-router/proxy/internal/ratelimit"
 	"github.com/admin/maas-router/proxy/internal/stream"
 	"github.com/admin/maas-router/proxy/internal/tokenizer"
 	tanthropic "github.com/admin/maas-router/proxy/internal/translate/anthropic"
@@ -34,6 +36,8 @@ type AnthropicHandler struct {
 	Tokenizers *tokenizer.Registry
 	Keys       map[string]string
 	Reactor    *logging.Reactor
+	RateLimit  *ratelimit.Limiter
+	UserRPM    int
 }
 
 // extractBearer accepts either Anthropic's `x-api-key: sk-or-...` or the
@@ -95,6 +99,14 @@ func (h *AnthropicHandler) Messages(w http.ResponseWriter, r *http.Request) {
 			writeAnthropicError(w, http.StatusUnauthorized, "authentication_error", "invalid API key")
 		}
 		return
+	}
+
+	if h.RateLimit != nil {
+		if rl, _ := h.RateLimit.Allow(ctx, "user", result.UserID.String(), h.UserRPM); !rl.Allowed {
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", int(rl.RetryAfter.Seconds())))
+			writeAnthropicError(w, http.StatusTooManyRequests, "rate_limit_error", "rate limit exceeded")
+			return
+		}
 	}
 
 	// Catalog lookup — use req.Model as alias; map to upstream

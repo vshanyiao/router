@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/admin/maas-router/proxy/internal/catalog"
 	"github.com/admin/maas-router/proxy/internal/logging"
 	"github.com/admin/maas-router/proxy/internal/provider"
+	"github.com/admin/maas-router/proxy/internal/ratelimit"
 	"github.com/admin/maas-router/proxy/internal/stream"
 	"github.com/admin/maas-router/proxy/internal/tokenizer"
 	toai "github.com/admin/maas-router/proxy/internal/translate/oai"
@@ -33,6 +35,8 @@ type OpenAIHandler struct {
 	Tokenizers *tokenizer.Registry
 	Keys       map[string]string
 	Reactor    *logging.Reactor
+	RateLimit  *ratelimit.Limiter
+	UserRPM    int
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
@@ -81,6 +85,14 @@ func (h *OpenAIHandler) ChatCompletions(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusUnauthorized, "invalid API key")
 		}
 		return
+	}
+
+	if h.RateLimit != nil {
+		if rl, _ := h.RateLimit.Allow(ctx, "user", result.UserID.String(), h.UserRPM); !rl.Allowed {
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", int(rl.RetryAfter.Seconds())))
+			writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
+			return
+		}
 	}
 
 	model, err := h.Catalog.Get(req.Model)
