@@ -30,6 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <Link href="/dashboard/keys" className="block rounded px-3 py-2 hover:bg-gray-100">API Keys</Link>
           <Link href="/dashboard/billing" className="block rounded px-3 py-2 hover:bg-gray-100">Billing</Link>
           <Link href="/dashboard/usage" className="block rounded px-3 py-2 hover:bg-gray-100">Usage</Link>
+          <Link href="/dashboard/playground" className="block rounded px-3 py-2 hover:bg-gray-100">Playground</Link>
           {isAdmin && (
             <Link href="/admin" className="block rounded px-3 py-2 font-medium text-red-700 hover:bg-red-50">
               ⚙️ Admin
