@@ -1,71 +1,74 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
+type Phase = 'polling' | 'succeeded' | 'timeout'
+
 export default function TopupSuccessPage() {
-  const [balance, setBalance] = useState<number | null>(null)
-  const [polled, setPolled] = useState(0)
-  const initialBalanceRef = useRef<number | null>(null)
-  const settledRef = useRef(false)
-  const maxPolls = 15 // ~30s at 2s intervals
+  const params = useSearchParams()
+  const piId = params.get('pi')
+  const [phase, setPhase] = useState<Phase>('polling')
+  const [creditsCents, setCreditsCents] = useState<number | null>(null)
 
   useEffect(() => {
-    let cancelled = false
+    if (!piId) {
+      setPhase('timeout')
+      return
+    }
 
-    async function tick() {
-      if (cancelled || settledRef.current) return
+    let cancelled = false
+    let attempts = 0
+    const maxAttempts = 15 // ~30s at 2s intervals
+
+    async function poll() {
+      if (cancelled) return
+      attempts++
       try {
-        const r = await fetch('/api/credits/balance')
-        if (!r.ok) return
-        const data = await r.json()
-        if (initialBalanceRef.current === null) {
-          initialBalanceRef.current = data.creditsCents
-        }
-        setBalance(data.creditsCents)
-        if (data.creditsCents > (initialBalanceRef.current ?? 0)) {
-          settledRef.current = true
+        const r = await fetch(`/api/topup/status?pi=${encodeURIComponent(piId!)}`)
+        if (r.ok) {
+          const data = await r.json()
+          if (data.status === 'succeeded') {
+            if (!cancelled) {
+              setCreditsCents(data.creditsAddedCents)
+              setPhase('succeeded')
+            }
+            return // stop polling
+          }
         }
       } catch {
-        // swallow — next tick will retry
+        // transient — keep polling
       }
+      if (attempts >= maxAttempts) {
+        if (!cancelled) setPhase('timeout')
+        return
+      }
+      timer = setTimeout(poll, 2000)
     }
 
-    tick()
-    const interval = setInterval(() => {
-      setPolled((p) => {
-        if (p >= maxPolls || settledRef.current) {
-          clearInterval(interval)
-          return p
-        }
-        tick()
-        return p + 1
-      })
-    }, 2000)
+    let timer = setTimeout(poll, 0)
     return () => {
       cancelled = true
-      clearInterval(interval)
+      clearTimeout(timer)
     }
-  }, [])
-
-  const settled = settledRef.current
-  const giveUp = polled >= maxPolls && !settled
+  }, [piId])
 
   return (
     <div className="mx-auto max-w-md p-8 text-center">
       <h1 className="mb-2 text-2xl font-bold">
-        {settled ? '✓ Credits added' : 'Payment received'}
+        {phase === 'succeeded' ? '✓ Credits added' : 'Payment received'}
       </h1>
       <p className="mb-6 text-gray-600">
-        {settled
+        {phase === 'succeeded'
           ? 'Your balance has been updated.'
-          : giveUp
-          ? 'Webhook is still processing — your balance will update shortly. Refresh to check.'
-          : 'Waiting for credits to land in your account…'}
+          : phase === 'timeout'
+          ? 'Still processing — your balance will update shortly. Refresh billing to check.'
+          : 'Confirming your payment…'}
       </p>
-      {balance !== null && (
+      {phase === 'succeeded' && creditsCents !== null && (
         <div className="mb-6 rounded-lg border p-4">
-          <div className="text-xs uppercase text-gray-500">Current balance</div>
-          <div className="text-3xl font-bold">${(balance / 100).toFixed(2)}</div>
+          <div className="text-xs uppercase text-gray-500">Credits added</div>
+          <div className="text-3xl font-bold">${(creditsCents / 100).toFixed(2)}</div>
         </div>
       )}
       <Link href="/dashboard/billing" className="text-indigo-600 hover:underline">
