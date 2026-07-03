@@ -1,0 +1,41 @@
+# AWS ALB Ingress (requires the AWS Load Balancer Controller installed in-cluster).
+#
+# One internet-facing ALB fronts both services by host:
+#   app.example.com -> web:3000
+#   api.example.com -> proxy:8080
+# TLS terminates at the ALB using the ACM cert; port 80 redirects to 443.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: maas
+  namespace: maas
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    # PLACEHOLDER: ACM certificate ARN covering app.example.com + api.example.com.
+    alb.ingress.kubernetes.io/certificate-arn: ${ACM_CERT_ARN}
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+spec:
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 3000
+    - host: api.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: proxy
+                port:
+                  number: 8080
