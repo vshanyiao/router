@@ -48,6 +48,9 @@ services:
       HMAC_SERVER_SECRET: ${HMAC_SERVER_SECRET}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY}
+      # Playground server-proxies to the Go inference service over the compose network.
+      PROXY_URL: http://proxy:8080
     depends_on:
       postgres:
         condition: service_healthy
