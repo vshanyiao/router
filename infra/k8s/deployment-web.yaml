@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: maas-web
+  namespace: maas
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: maas
+  labels:
+    app: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      serviceAccountName: maas-web
+      containers:
+        - name: web
+          image: ${ECR_REGISTRY}/maas-web:${IMAGE_TAG}
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: maas-secrets
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: NEXTAUTH_URL
+              # PLACEHOLDER: public HTTPS URL of the web app (matches ingress host).
+              value: https://app.example.com
+            - name: PROXY_URL
+              value: http://proxy.maas.svc.cluster.local:8080
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 15

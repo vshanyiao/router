@@ -1,0 +1,61 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: MaaS Router — root stack composing network/data/eks/app (ap-east-1)
+
+# Nested stacks require the child templates to be uploaded to S3 first:
+#   aws s3 sync infra/cloudformation/ s3://<TemplatesBucket>/cloudformation/
+# then:
+#   aws cloudformation deploy --template-file infra/cloudformation/root.yaml \
+#     --stack-name maas-prod --capabilities CAPABILITY_NAMED_IAM \
+#     --parameter-overrides TemplatesBucket=<bucket> --region ap-east-1
+#
+# 05-dns.yaml is intentionally NOT nested here — it must run AFTER the ALB
+# Ingress provisions the load balancer (its alias target is unknown until then).
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: maas-prod
+  TemplatesBucket:
+    Type: String
+    Description: S3 bucket holding the child templates under cloudformation/
+
+Resources:
+  Network:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplatesBucket}.s3.amazonaws.com/cloudformation/01-network.yaml'
+      Parameters: { EnvName: !Ref EnvName }
+
+  Data:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: Network
+    Properties:
+      TemplateURL: !Sub 'https://${TemplatesBucket}.s3.amazonaws.com/cloudformation/02-data.yaml'
+      Parameters: { EnvName: !Ref EnvName }
+
+  Eks:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: Network
+    Properties:
+      TemplateURL: !Sub 'https://${TemplatesBucket}.s3.amazonaws.com/cloudformation/03-eks.yaml'
+      Parameters: { EnvName: !Ref EnvName }
+
+  App:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${TemplatesBucket}.s3.amazonaws.com/cloudformation/04-app.yaml'
+      Parameters: { EnvName: !Ref EnvName }
+
+Outputs:
+  ClusterName:
+    Value: !GetAtt Eks.Outputs.ClusterName
+  RdsEndpoint:
+    Value: !GetAtt Data.Outputs.RdsEndpoint
+  RedisEndpoint:
+    Value: !GetAtt Data.Outputs.RedisEndpoint
+  WebRepoUri:
+    Value: !GetAtt App.Outputs.WebRepoUri
+  ProxyRepoUri:
+    Value: !GetAtt App.Outputs.ProxyRepoUri
+  DeployRoleArn:
+    Value: !GetAtt App.Outputs.DeployRoleArn

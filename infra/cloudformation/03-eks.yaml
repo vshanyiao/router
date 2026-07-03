@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: MaaS Router — EKS cluster + managed node group
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: maas-prod
+  KubernetesVersion:
+    Type: String
+    Default: '1.30'
+  NodeInstanceType:
+    Type: String
+    Default: t3.medium
+  NodeDesired:
+    Type: Number
+    Default: 2
+  NodeMax:
+    Type: Number
+    Default: 5
+
+Resources:
+  ClusterRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${EnvName}-eks-cluster'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: eks.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+
+  Cluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref EnvName
+      Version: !Ref KubernetesVersion
+      RoleArn: !GetAtt ClusterRole.Arn
+      ResourcesVpcConfig:
+        SubnetIds: !Split
+          - ','
+          - !Join
+            - ','
+            - - { 'Fn::ImportValue': !Sub '${EnvName}-PrivateSubnetIds' }
+              - { 'Fn::ImportValue': !Sub '${EnvName}-PublicSubnetIds' }
+        EndpointPublicAccess: true
+        EndpointPrivateAccess: true
+
+  NodeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${EnvName}-eks-node'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+
+  NodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      ClusterName: !Ref Cluster
+      NodegroupName: !Sub '${EnvName}-ng'
+      NodeRole: !GetAtt NodeRole.Arn
+      Subnets: !Split [',', { 'Fn::ImportValue': !Sub '${EnvName}-PrivateSubnetIds' }]
+      InstanceTypes: [!Ref NodeInstanceType]
+      CapacityType: SPOT
+      ScalingConfig:
+        MinSize: 2
+        DesiredSize: !Ref NodeDesired
+        MaxSize: !Ref NodeMax
+
+  # OIDC provider enables IRSA (IAM Roles for Service Accounts) — required by
+  # External Secrets Operator and the AWS Load Balancer Controller.
+  OidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: !GetAtt Cluster.OpenIdConnectIssuerUrl
+      ClientIdList: [sts.amazonaws.com]
+      ThumbprintList: ['9e99a48a9960b14926bb7f3b02e22da2b0ab7280']
+
+Outputs:
+  ClusterName:
+    Value: !Ref Cluster
+    Export: { Name: !Sub '${EnvName}-ClusterName' }
+  ClusterOidcUrl:
+    Value: !GetAtt Cluster.OpenIdConnectIssuerUrl
+    Export: { Name: !Sub '${EnvName}-ClusterOidcUrl' }

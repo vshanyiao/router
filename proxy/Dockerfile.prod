@@ -1,0 +1,24 @@
+# Production image for the Go inference proxy.
+
+# ---- Builder ----------------------------------------------------------------
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum* ./
+RUN go mod download
+
+COPY . .
+
+# Statically linked binary so it runs on a distroless/static base with no libc.
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /proxy ./cmd/proxy
+
+# ---- Runner -----------------------------------------------------------------
+# distroless/static: no shell, no package manager, runs as nonroot by default.
+FROM gcr.io/distroless/static:nonroot
+
+COPY --from=builder /proxy /proxy
+
+EXPOSE 8080
+
+ENTRYPOINT ["/proxy"]

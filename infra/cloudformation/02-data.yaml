@@ -1,0 +1,115 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: MaaS Router — data plane (RDS Postgres multi-AZ, ElastiCache Redis, Secrets Manager)
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: maas-prod
+  DBInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+  RedisNodeType:
+    Type: String
+    Default: cache.t4g.micro
+
+Resources:
+  # --- security groups ---
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Postgres access from within the VPC
+      VpcId: { 'Fn::ImportValue': !Sub '${EnvName}-VpcId' }
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 10.0.0.0/16
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Redis access from within the VPC
+      VpcId: { 'Fn::ImportValue': !Sub '${EnvName}-VpcId' }
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: 10.0.0.0/16
+
+  # --- subnet groups (private subnets) ---
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: MaaS private subnets
+      SubnetIds: !Split [',', { 'Fn::ImportValue': !Sub '${EnvName}-PrivateSubnetIds' }]
+  RedisSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: MaaS private subnets
+      SubnetIds: !Split [',', { 'Fn::ImportValue': !Sub '${EnvName}-PrivateSubnetIds' }]
+
+  # --- RDS credentials in Secrets Manager (auto-generated password) ---
+  DBSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${EnvName}/db-master'
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"app"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludeCharacters: '"@/\'
+
+  Postgres:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub '${EnvName}-pg'
+      Engine: postgres
+      EngineVersion: '16'
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref DBAllocatedStorage
+      DBName: maas
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DBSecret}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DBSecret}:SecretString:password}}'
+      MultiAZ: true
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7
+      VPCSecurityGroups: [!Ref DBSecurityGroup]
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: false
+
+  Redis:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      ClusterName: !Sub '${EnvName}-redis'
+      Engine: redis
+      CacheNodeType: !Ref RedisNodeType
+      NumCacheNodes: 1
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+      VpcSecurityGroupIds: [!Ref RedisSecurityGroup]
+
+  # --- application secrets (populate values manually or via CI after create) ---
+  AppSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${EnvName}/prod'
+      Description: >-
+        Application secrets consumed by External Secrets Operator into the
+        maas-secrets k8s Secret. Populate keys: database-url, redis-url,
+        nextauth-secret, github-client-id, github-client-secret, resend-api-key,
+        hmac-server-secret, openai-api-key, anthropic-api-key, gemini-api-key,
+        stripe-secret-key, stripe-webhook-secret, turnstile-secret-key.
+      SecretString: '{}'
+
+Outputs:
+  RdsEndpoint:
+    Value: !GetAtt Postgres.Endpoint.Address
+    Export: { Name: !Sub '${EnvName}-RdsEndpoint' }
+  RedisEndpoint:
+    Value: !GetAtt Redis.RedisEndpoint.Address
+    Export: { Name: !Sub '${EnvName}-RedisEndpoint' }
+  AppSecretArn:
+    Value: !Ref AppSecret
+    Export: { Name: !Sub '${EnvName}-AppSecretArn' }
