@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: MaaS Router — ECR repos + CI/CD OIDC deploy role
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: maas-prod
+  GitHubOrg:
+    Type: String
+    Default: vshanyiao
+  GitHubRepo:
+    Type: String
+    Default: router
+
+Resources:
+  WebRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: maas-web
+      ImageScanningConfiguration: { ScanOnPush: true }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"keep last 30","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}
+  ProxyRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: maas-proxy
+      ImageScanningConfiguration: { ScanOnPush: true }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"keep last 30","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":30},"action":{"type":"expire"}}]}
+
+  # GitHub Actions assumes this via OIDC (no long-lived keys). Requires the
+  # GitHub OIDC provider to already exist in the account (arn below).
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      ThumbprintList: ['6938fd4d98bab03faadb97b34396831e3780aea1']
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${EnvName}-github-deploy'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Federated: !Ref GitHubOidcProvider }
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubOrg}/${GitHubRepo}:*'
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+      Policies:
+        - PolicyName: ecr-and-eks
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:PutImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                Resource: '*'
+              - Effect: Allow
+                Action: [eks:DescribeCluster]
+                Resource: '*'
+
+Outputs:
+  WebRepoUri:
+    Value: !GetAtt WebRepo.RepositoryUri
+    Export: { Name: !Sub '${EnvName}-WebRepoUri' }
+  ProxyRepoUri:
+    Value: !GetAtt ProxyRepo.RepositoryUri
+    Export: { Name: !Sub '${EnvName}-ProxyRepoUri' }
+  DeployRoleArn:
+    Value: !GetAtt DeployRole.Arn
+    Export: { Name: !Sub '${EnvName}-DeployRoleArn' }

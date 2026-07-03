@@ -1,0 +1,98 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (usually the git SHA built by build.yml)"
+        required: true
+
+# OIDC federation for aws-actions/configure-aws-credentials.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-east-1
+  CLUSTER: maas-prod
+  NAMESPACE: maas
+
+jobs:
+  deploy:
+    name: migrate + rollout
+    runs-on: ubuntu-latest
+    # Requires a GitHub Environment named "production" with required reviewers
+    # configured, so a human approves before the deploy proceeds.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name "$CLUSTER" --region "$AWS_REGION"
+
+      - name: Run DB migration (one-shot Job)
+        env:
+          ECR: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ inputs.image_tag }}
+        # The migration runs prisma migrate deploy from the same maas-web image.
+        # It needs DATABASE_URL, injected via --overrides from the existing
+        # "maas-prod-db" secret (synced from Secrets Manager by ESO). The
+        # container name in the override must match kubectl's generated name
+        # (the pod name) so the env is applied to the right container.
+        #
+        # For anything beyond a smoke deploy prefer a checked-in migrate Job
+        # manifest (infra/k8s/migrate-job.yaml) with envFrom the secret and
+        # `kubectl apply` + `kubectl wait --for=condition=complete` — it is
+        # easier to audit and re-run than an inline --overrides blob.
+        run: |
+          NAME="migrate-${{ github.run_id }}"
+          kubectl run "$NAME" \
+            --rm -i --restart=Never \
+            --namespace "$NAMESPACE" \
+            --image="$ECR/maas-web:$TAG" \
+            --overrides='{
+              "spec": {
+                "containers": [{
+                  "name": "'"$NAME"'",
+                  "image": "'"$ECR"'/maas-web:'"$TAG"'",
+                  "env": [{
+                    "name": "DATABASE_URL",
+                    "valueFrom": {
+                      "secretKeyRef": { "name": "maas-prod-db", "key": "DATABASE_URL" }
+                    }
+                  }]
+                }]
+              }
+            }' \
+            --command -- sh -c "npx prisma migrate deploy"
+
+      - name: Roll out web
+        env:
+          ECR: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ inputs.image_tag }}
+        run: |
+          kubectl set image deployment/web \
+            web="$ECR/maas-web:$TAG" -n "$NAMESPACE"
+
+      - name: Roll out proxy
+        env:
+          ECR: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ inputs.image_tag }}
+        run: |
+          kubectl set image deployment/proxy \
+            proxy="$ECR/maas-proxy:$TAG" -n "$NAMESPACE"
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/web -n "$NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/proxy -n "$NAMESPACE" --timeout=300s

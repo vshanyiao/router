@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: MaaS Router — ACM certificate + Route53 records (run after ALB Ingress exists)
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: maas-prod
+  HostedZoneId:
+    Type: String
+    Description: Existing Route53 hosted zone id for your domain
+  ApexDomain:
+    Type: String
+    Description: e.g. example.com
+  AppHost:
+    Type: String
+    Default: app
+  ApiHost:
+    Type: String
+    Default: api
+
+Resources:
+  # DNS-validated cert covering app.<domain> and api.<domain>. Add the CNAME
+  # validation records to the hosted zone (or use DNS validation auto-records).
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Sub '${AppHost}.${ApexDomain}'
+      SubjectAlternativeNames:
+        - !Sub '${ApiHost}.${ApexDomain}'
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Sub '${AppHost}.${ApexDomain}'
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: !Sub '${ApiHost}.${ApexDomain}'
+          HostedZoneId: !Ref HostedZoneId
+
+  # NOTE: the ALB DNS name is only known after the k8s Ingress provisions the
+  # load balancer. Fill AlbDnsName / AlbHostedZoneId (or convert to an alias
+  # record) once `kubectl get ingress -n maas` shows the ADDRESS. These records
+  # are commented as a template — apply after the ALB exists.
+  #
+  # AppRecord:
+  #   Type: AWS::Route53::RecordSet
+  #   Properties:
+  #     HostedZoneId: !Ref HostedZoneId
+  #     Name: !Sub '${AppHost}.${ApexDomain}'
+  #     Type: A
+  #     AliasTarget:
+  #       DNSName: <alb-dns-name>
+  #       HostedZoneId: <alb-hosted-zone-id>
+  #       EvaluateTargetHealth: true
+
+Outputs:
+  CertificateArn:
+    Value: !Ref Certificate
+    Export: { Name: !Sub '${EnvName}-CertificateArn' }
